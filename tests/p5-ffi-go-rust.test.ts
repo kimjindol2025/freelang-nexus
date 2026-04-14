@@ -5,10 +5,11 @@
  * 검증: 동일 소스 5회 빌드 → 동일 바이너리 & 출력
  */
 
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, spawnSync } from 'child_process';
+import { sha256, getHashDisplay } from './utils';
+import { TempDirManager } from './utils';
 
 const FFI_CONFIG = {
   WORK_DIR_PREFIX: 'p5_ffi_run_',
@@ -16,20 +17,15 @@ const FFI_CONFIG = {
   BASELINE_FILE: 'p5-baseline-ffi.json',
   HASH_DISPLAY_LEN: 12,
   ITERATIONS: 5,
+  STRICT_MODE: process.env.FFI_STRICT === 'true',
+  DEBUG: process.env.FFI_DEBUG === 'true',
 } as const;
-
-function sha256(data: string | Buffer): string {
-  if (typeof data === 'string') {
-    return crypto.createHash('sha256').update(data).digest('hex');
-  }
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
 
 interface FFIRun {
   runIndex: number;
   goLibHash: string;      // Go 라이브러리 (.so) 해시
   rustBinaryHash: string; // Rust 바이너리 해시
-  stdout: string;
+  stdout?: string;        // DEBUG 모드에서만 저장
   stdoutHash: string;
   exitCode: number;
   timeMs: number;
@@ -85,10 +81,6 @@ function recordFFIMetrics(testName: string, runs: FFIRun[]): void {
   fs.writeFileSync(baselineFile, JSON.stringify(existingData, null, 2));
 }
 
-function getHashDisplay(hash: string): string {
-  return hash.substring(0, FFI_CONFIG.HASH_DISPLAY_LEN);
-}
-
 describe('v1.0.1 — Go+Rust FFI Reproducibility', () => {
 
   describe('FFI Compilation & Execution', () => {
@@ -131,12 +123,11 @@ fn main() {
 `;
 
       const runs: FFIRun[] = [];
-      const tempDirs: string[] = [];
+      const manager = new TempDirManager();
 
       try {
         for (let i = 0; i < FFI_CONFIG.ITERATIONS; i++) {
-          const workDir = path.join(__dirname, '..', '.tmp', `${FFI_CONFIG.WORK_DIR_PREFIX}${i}_${Date.now()}`);
-          tempDirs.push(workDir);
+          const workDir = manager.create(FFI_CONFIG.WORK_DIR_PREFIX);
 
           const start = Date.now();
 
@@ -157,6 +148,9 @@ fn main() {
           } catch (e) {
             const stderr = (e as any).stderr?.toString() || (e as any).message || '';
             const errMsg = stderr.substring(0, 80).replace(/\n/g, ' ');
+            if (FFI_CONFIG.STRICT_MODE) {
+              throw new Error(`Go build failed: ${errMsg || 'unknown error'}`);
+            }
             console.log(`  Go build failed (run ${i}): ${errMsg || 'unknown error'}`);
             continue;
           }
@@ -173,6 +167,9 @@ fn main() {
           } catch (e) {
             const stderr = (e as any).stderr?.toString() || (e as any).message || '';
             const errMsg = stderr.substring(0, 80).replace(/\n/g, ' ');
+            if (FFI_CONFIG.STRICT_MODE) {
+              throw new Error(`Rust build failed: ${errMsg || 'unknown error'}`);
+            }
             console.log(`  Rust build failed (run ${i}): ${errMsg || 'unknown error'}`);
             continue;
           }
@@ -194,7 +191,7 @@ fn main() {
             runIndex: i,
             goLibHash,
             rustBinaryHash,
-            stdout,
+            ...(FFI_CONFIG.DEBUG ? { stdout } : {}),
             stdoutHash,
             exitCode,
             timeMs,
@@ -232,13 +229,7 @@ fn main() {
 
         recordFFIMetrics('Go+Rust FFI (FFI1)', runs);
       } finally {
-        tempDirs.forEach(dir => {
-          try {
-            fs.rmSync(dir, { recursive: true, force: true });
-          } catch (e) {
-            // cleanup 실패는 경고만 (일시적 파일 정도)
-          }
-        });
+        manager.cleanup();
       }
     });
   });
