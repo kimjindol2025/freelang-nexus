@@ -2,7 +2,7 @@
 
 **FreeLang Nexus는 다중언어 코드와 다중언어 라이브러리를 하나의 안정적인 빌드로 통합하는 polyglot systems compiler입니다.**
 
-Rust, Go, Python, C, Zig, Julia를 단일 `.fl` 파일에서 혼합 작성하고, **자동 FFI 생성과 의존성 정렬을 통해 최종 컴파일을 단일화합니다.**
+Rust, Go, C, C++, Python, Zig, Mojo, V, Julia를 단일 `.fl` 파일에서 혼합 작성하고, **자동 FFI 생성과 의존성 정렬을 통해 최종 컴파일을 단일화합니다.**
 
 ### 🔒 우리가 보장하는 것
 
@@ -59,7 +59,8 @@ fn main() -> i64 {
 
 - **V**: 타입 안전한 오케스트레이션 (C로 컴파일)
 - **Python**: 동적 스크립팅 (분석, 통계)
-- **Rust/Go/C/Zig/Julia**: 각 언어의 강점 직접 활용
+- **Rust/Go/C/C++/Zig/Mojo**: 각 언어의 강점 직접 활용
+- **Julia**: 과학 계산 (수치해석, ML)
 
 ```fl
 @lang("rust")  ─┐

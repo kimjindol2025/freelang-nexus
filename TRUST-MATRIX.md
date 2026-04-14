@@ -6,7 +6,7 @@
 
 ## 📋 5가지 불변조건의 현재 상태
 
-마지막 검증: **2026-04-14** (매월 업데이트)
+마지막 검증: **2026-04-14 → 2026-04-14 (P3 완료)** (매월 업데이트)
 
 ### 1️⃣ Deterministic Build Graph
 
@@ -34,9 +34,10 @@
 | i32/i64/f64 매핑 | ✅ Level 3 | Level 3 | ABI contract tests | 2026-04-14 | 유지 |
 | 포인터 안전성 | ⚠️ Level 2 | Level 3 | Rust FFI 감사 필요 | 2026-04-10 | 5월 감사 예정 |
 | 구조체 전달 | ❌ Level 1 | Level 2 | 지원되지 않음 | 없음 | 6월 계획 |
-| 함수 호출 규약 | ✅ Level 3 | Level 3 | 모든 언어에서 검증 | 2026-04-14 | 유지 |
+| 함수 호출 규약 | ✅ Level 3 | Level 3 | 모든 언어(+Mojo/V) 자동 extern | 2026-04-14(P3) | 유지 |
 
 **현재 상태**: Level 2.4/3.0 (80%)  
+**P3 개선**: Mojo/V 자동 extern 추출 완성, 미지원 언어 정직화  
 **미보장 항목**: 구조체 전달, 포인터 고급 안전성
 
 **다음 검증**: 2026-05-14
@@ -107,10 +108,11 @@
 | 5. Reproducible Exec | 1.2 | 40% | **플랫폼 검증 + 성능 기준** |
 
 **전체 평균**: Level 2.4/3.0 (**80%**)  
-**진전**: P0 (60% → 70%) + P1 (70% → 73%) + P2 (73% → 80%) = +0.6
+**진전**: P0 (60% → 70%) + P1 (70% → 73%) + P2 (73% → 80%) + P3 (80% 정직성 개선) = +0.6
 - P0: +0.1 (Deterministic Build 80% → 93%)
 - P1: +0.3 (Failure Diagnostics 33% → 67%)
 - P2: +0.2 (Type Bridge 67% → 87%)
+- P3: +0.0 (Extern Extraction 완성, Stable ABI 정직화)
 
 **가장 약한 부분**: #5 (Reproducible Execution)  
 **다음 우선**: P3 Extern Extraction + P4 Parallel Failure Isolation

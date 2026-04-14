@@ -875,21 +875,33 @@ static void fl_print_str(const char *s) { printf("%s",s); }
         const fnName = fnMatch[1];
         const paramStr = fnMatch[2];
         const retTypeStr = fnMatch[3] || 'void';
-        this.writeC(`extern void ${fnName}(void);`);
+        const cRetType = this.mojoTypeToCType(retTypeStr);
+        const cParams = this.mojoParamsToCParams(paramStr);
+        this.writeC(`extern ${cRetType} ${fnName}(${cParams || 'void'});`);
       }
     }
 
     // V언어인 경우, pub fn 함수 선언 추출
     if (block.lang.toLowerCase() === 'v') {
-      // pub fn funcName(args) Type { ... }
-      const fnPattern = /pub\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(\S+)?\s*\{/g;
+      // pub fn funcName(params) RetType { ... }
+      const fnPattern = /pub\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(\w+)?\s*\{/g;
       let fnMatch;
       while ((fnMatch = fnPattern.exec(block.sourceCode)) !== null) {
         const fnName = fnMatch[1];
         const paramStr = fnMatch[2];
         const retTypeStr = fnMatch[3] || 'void';
-        this.writeC(`extern void ${fnName}(void);`);
+        const cRetType = this.vTypeToCType(retTypeStr);
+        const cParams = this.vParamsToCParams(paramStr);
+        this.writeC(`extern ${cRetType} ${fnName}(${cParams || 'void'});`);
       }
+    }
+
+    // Julia, Haskell 등 미지원 언어: 자동 추출 없음
+    if (['julia', 'haskell', 'clojure', 'kotlin'].includes(block.lang.toLowerCase())) {
+      console.warn(
+        `[FreeLang Nexus] ${block.lang} extern 자동 추출 미지원. ` +
+        `수동 extern 선언을 @call이나 주석으로 제공하세요.`
+      );
     }
 
     // C/C++인 경우: .so로 빌드하므로 소스 인라인 금지
@@ -946,6 +958,79 @@ static void fl_print_str(const char *s) { printf("%s",s); }
       const name = parts.slice(0, -1).join('');
       if (!name || !type) return '';
       const cType = this.goTypeToCType(type);
+      return `${cType} ${name}`;
+    }).filter(Boolean);
+
+    return params.join(', ');
+  }
+
+  // Mojo 타입 → C 타입 매핑
+  private mojoTypeToCType(mojoType: string): string {
+    const mapping: Record<string, string> = {
+      'UInt8': 'unsigned char',
+      'UInt16': 'unsigned short',
+      'UInt32': 'unsigned int',
+      'UInt64': 'unsigned long long',
+      'Int8': 'char',
+      'Int16': 'short',
+      'Int32': 'int',
+      'Int64': 'long long',
+      'Float32': 'float',
+      'Float64': 'double',
+      'Bool': 'int',
+      'void': 'void',
+    };
+    return mapping[mojoType.trim()] || 'void';
+  }
+
+  // Mojo 파라미터 목록 → C 파라미터 목록
+  private mojoParamsToCParams(paramStr: string): string {
+    if (!paramStr.trim()) return '';
+
+    // Mojo 파라미터 형식: name: Type, name: Type2
+    const params = paramStr.split(',').map(p => {
+      const match = p.trim().match(/^(\w+)\s*:\s*(\w+)$/);
+      if (!match) return '';
+      const name = match[1];
+      const type = match[2];
+      const cType = this.mojoTypeToCType(type);
+      return `${cType} ${name}`;
+    }).filter(Boolean);
+
+    return params.join(', ');
+  }
+
+  // V 타입 → C 타입 매핑
+  private vTypeToCType(vType: string): string {
+    const mapping: Record<string, string> = {
+      'u8': 'unsigned char',
+      'u16': 'unsigned short',
+      'u32': 'unsigned int',
+      'u64': 'unsigned long long',
+      'i8': 'char',
+      'i16': 'short',
+      'i32': 'int',
+      'i64': 'long long',
+      'f32': 'float',
+      'f64': 'double',
+      'bool': 'int',
+      'void': 'void',
+    };
+    return mapping[vType.trim()] || 'void';
+  }
+
+  // V 파라미터 목록 → C 파라미터 목록
+  private vParamsToCParams(paramStr: string): string {
+    if (!paramStr.trim()) return '';
+
+    // V 파라미터 형식: name Type, name Type2
+    const params = paramStr.split(',').map(p => {
+      const parts = p.trim().split(/\s+/);
+      if (parts.length < 2) return '';
+      const type = parts[parts.length - 1];
+      const name = parts.slice(0, -1).join('');
+      if (!name || !type) return '';
+      const cType = this.vTypeToCType(type);
       return `${cType} ${name}`;
     }).filter(Boolean);
 
