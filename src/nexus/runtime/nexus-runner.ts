@@ -7,6 +7,7 @@ import { execSync, spawnSync, SpawnSyncReturns } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { CodegenResult } from '../codegen/nexus-codegen';
 import { DependencyGraph, BuildNode } from './dependency-graph';
 
@@ -18,6 +19,9 @@ export interface RunResult {
 
 export class NexusRunner {
   private ccCache: string | null = null;
+  // 결정적 임시 파일명을 위해 프로세스 시작 시 고정 ID + 카운터 사용
+  private readonly processStartId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+  private tmpFileCounter = 0;
 
   /**
    * CodegenResult 전체 실행 (C + Python 모두)
@@ -111,11 +115,18 @@ export class NexusRunner {
           buildCmd = buildCmd.replace(/^go build/, 'go build -buildmode=c-shared');
         }
 
+        // 소스코드 해시 기반 결정적 workDir 생성 (같은 코드 → 같은 디렉토리)
+        let langBlockWorkDir = sharedWorkDir;
+        if (node.sourceCode) {
+          const srcHash = crypto.createHash('sha256').update(node.sourceCode).digest('hex').substring(0, 12);
+          langBlockWorkDir = path.join(sharedWorkDir, `lang_${node.lang}_${srcHash}`);
+        }
+
         const soPath = NexusRunner.buildLangBlock(
           node.lang,
           buildCmd,
           node.artifact,
-          sharedWorkDir,
+          langBlockWorkDir,
           node.sourceCode,
           node.sourceName
         );
@@ -145,7 +156,9 @@ export class NexusRunner {
     // C 코드 실행 (linkFlags + extraFlags 자동 전달)
     if (result.c && result.c.trim()) {
       try {
-        cOutput = this.runC(result.c, [...(result.linkFlags || []), ...extraFlags]);
+        // 결정적 정렬: 같은 flags → 같은 순서
+        const allFlags = [...(result.linkFlags || []), ...extraFlags].sort();
+        cOutput = this.runC(result.c, allFlags);
       } catch (e) {
         errors.push(`C 컴파일/실행 에러: ${(e as Error).message}`);
       }
@@ -170,8 +183,9 @@ export class NexusRunner {
    * @param linkFlags  추가 링크 플래그 (['-lsqlite3', '-lm'] 등)
    */
   runC(cCode: string, linkFlags: string[] = []): string {
-    const cFile = this.tmpFile('.c');
-    const binFile = this.tmpFile('');
+    // 결정적: 같은 C 코드 → 같은 파일명
+    const cFile = this.tmpFile('.c', cCode);
+    const binFile = this.tmpFile('', cCode);
 
     try {
       // C 코드를 임시 파일에 저장
@@ -221,7 +235,8 @@ export class NexusRunner {
    * 임시 파일 → python3 실행 → 정리
    */
   runPython(pyCode: string): string {
-    const pyFile = this.tmpFile('.py');
+    // 결정적: 같은 Python 코드 → 같은 파일명
+    const pyFile = this.tmpFile('.py', pyCode);
 
     try {
       // Python 코드를 임시 파일에 저장
@@ -569,10 +584,25 @@ func main() {}
     }
   }
 
-  private tmpFile(ext: string): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const filename = `nexus_${timestamp}_${random}${ext}`;
-    return path.join(os.tmpdir(), filename);
+  /**
+   * 결정적 임시 파일 생성
+   * @param ext 파일 확장자 (예: '.c', '.py', '')
+   * @param content 파일 내용 (있으면 SHA256 해시 기반, 없으면 counter 기반)
+   * @returns 임시 파일 경로
+   */
+  private tmpFile(ext: string, content?: string): string {
+    let filenameBase: string;
+
+    if (content) {
+      // content hash 기반: 같은 내용 → 같은 파일명
+      const contentHash = crypto.createHash('sha256').update(content).digest('hex').substring(0, 12);
+      filenameBase = `nexus_${contentHash}`;
+    } else {
+      // content 없을 때: 프로세스 ID + 증가 카운터로 결정적 생성
+      filenameBase = `nexus_${this.processStartId}_${String(this.tmpFileCounter).padStart(4, '0')}`;
+      this.tmpFileCounter++;
+    }
+
+    return path.join(os.tmpdir(), `${filenameBase}${ext}`);
   }
 }
