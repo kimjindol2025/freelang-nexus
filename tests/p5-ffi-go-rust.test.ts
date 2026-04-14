@@ -3,17 +3,20 @@
  *
  * 목표: Go 라이브러리 + Rust FFI 호출의 재현성 검증
  * 검증: 동일 소스 5회 빌드 → 동일 바이너리 & 출력
- *
- * 계획:
- * 1. Go 소스 → libgo_lib.so 빌드
- * 2. Rust 소스 → Rust 바이너리 (Go 라이브러리 링크)
- * 3. 5회 반복 → 바이너리 해시 & 출력 비교
  */
 
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, spawnSync } from 'child_process';
+
+const FFI_CONFIG = {
+  WORK_DIR_PREFIX: 'p5_ffi_run_',
+  BASELINE_DIR: 'reports',
+  BASELINE_FILE: 'p5-baseline-ffi.json',
+  HASH_DISPLAY_LEN: 12,
+  ITERATIONS: 5,
+} as const;
 
 function sha256(data: string | Buffer): string {
   if (typeof data === 'string') {
@@ -53,11 +56,8 @@ function recordFFIMetrics(testName: string, runs: FFIRun[]): void {
 
   console.log(report);
 
-  // baseline 저장 (FFI 모드)
-  const baselineDir = path.join(__dirname, '..', 'reports');
-  if (!fs.existsSync(baselineDir)) {
-    fs.mkdirSync(baselineDir, { recursive: true });
-  }
+  const baselineDir = path.join(__dirname, '..', FFI_CONFIG.BASELINE_DIR);
+  fs.mkdirSync(baselineDir, { recursive: true });
 
   const ffiMetric = {
     testName,
@@ -76,13 +76,17 @@ function recordFFIMetrics(testName: string, runs: FFIRun[]): void {
     deviationPercent: parseFloat(deviation),
   };
 
-  const baselineFile = path.join(baselineDir, 'p5-baseline-ffi.json');
+  const baselineFile = path.join(baselineDir, FFI_CONFIG.BASELINE_FILE);
   const existingData = fs.existsSync(baselineFile)
     ? JSON.parse(fs.readFileSync(baselineFile, 'utf-8'))
     : [];
 
   existingData.push(ffiMetric);
   fs.writeFileSync(baselineFile, JSON.stringify(existingData, null, 2));
+}
+
+function getHashDisplay(hash: string): string {
+  return hash.substring(0, FFI_CONFIG.HASH_DISPLAY_LEN);
 }
 
 describe('v1.0.1 — Go+Rust FFI Reproducibility', () => {
@@ -130,25 +134,20 @@ fn main() {
       const tempDirs: string[] = [];
 
       try {
-        // 5회 반복: 각각 Go 라이브러리 + Rust 바이너리 빌드
-        for (let i = 0; i < 5; i++) {
-          const workDir = path.join(__dirname, '..', '.tmp', `p5_ffi_run_${i}_${Date.now()}`);
+        for (let i = 0; i < FFI_CONFIG.ITERATIONS; i++) {
+          const workDir = path.join(__dirname, '..', '.tmp', `${FFI_CONFIG.WORK_DIR_PREFIX}${i}_${Date.now()}`);
           tempDirs.push(workDir);
 
           const start = Date.now();
 
-          // 디렉토리 생성
           fs.mkdirSync(workDir, { recursive: true });
 
-          // Go 소스 저장
           const goFile = path.join(workDir, 'lib.go');
           fs.writeFileSync(goFile, goCode, 'utf-8');
 
-          // Rust 소스 저장
           const rustFile = path.join(workDir, 'main.rs');
           fs.writeFileSync(rustFile, rustCode, 'utf-8');
 
-          // Go 라이브러리 빌드 → libgo_lib.so
           const soPath = path.join(workDir, 'libgo_lib.so');
           try {
             execSync(`go build -buildmode=c-shared -o ${soPath} ${goFile}`, {
@@ -156,15 +155,15 @@ fn main() {
               stdio: 'pipe',
             });
           } catch (e) {
-            console.log(`  Go build failed (run ${i}): skipping`);
+            const stderr = (e as any).stderr?.toString() || (e as any).message || '';
+            const errMsg = stderr.substring(0, 80).replace(/\n/g, ' ');
+            console.log(`  Go build failed (run ${i}): ${errMsg || 'unknown error'}`);
             continue;
           }
 
-          // Go 라이브러리 해시
           const goLibContent = fs.readFileSync(soPath);
           const goLibHash = sha256(goLibContent);
 
-          // Rust 바이너리 빌드 (Go 라이브러리 링크)
           const rustBinaryPath = path.join(workDir, 'main');
           try {
             execSync(`rustc -O ${rustFile} -L${workDir} -lgo_lib -o ${rustBinaryPath}`, {
@@ -172,15 +171,15 @@ fn main() {
               stdio: 'pipe',
             });
           } catch (e) {
-            console.log(`  Rust build failed (run ${i}): skipping`);
+            const stderr = (e as any).stderr?.toString() || (e as any).message || '';
+            const errMsg = stderr.substring(0, 80).replace(/\n/g, ' ');
+            console.log(`  Rust build failed (run ${i}): ${errMsg || 'unknown error'}`);
             continue;
           }
 
-          // Rust 바이너리 해시
           const rustBinaryContent = fs.readFileSync(rustBinaryPath);
           const rustBinaryHash = sha256(rustBinaryContent);
 
-          // 실행
           const execResult = spawnSync(rustBinaryPath, [], {
             encoding: 'utf-8',
             env: { ...process.env, LD_LIBRARY_PATH: workDir },
@@ -201,12 +200,11 @@ fn main() {
             timeMs,
           });
 
-          console.log(`  Run ${i + 1}: go=${goLibHash.substring(0, 12)}... rust=${rustBinaryHash.substring(0, 12)}... time=${timeMs}ms`);
+          console.log(`  Run ${i + 1}: go=${getHashDisplay(goLibHash)}... rust=${getHashDisplay(rustBinaryHash)}... time=${timeMs}ms`);
         }
 
-        // 검증
-        if (runs.length < 5) {
-          console.log(`⚠️  FFI1: Go 또는 Rust 툴체인 부재 (${runs.length}/5 빌드 성공)`);
+        if (runs.length < FFI_CONFIG.ITERATIONS) {
+          console.log(`⚠️  FFI1: Go 또는 Rust 툴체인 부재 (${runs.length}/${FFI_CONFIG.ITERATIONS} 빌드 성공)`);
           expect(runs.length).toBeGreaterThan(0);
           return;
         }
@@ -215,34 +213,30 @@ fn main() {
         const uniqueRustBinaries = new Set(runs.map(r => r.rustBinaryHash));
         const uniqueOutputs = new Set(runs.map(r => r.stdoutHash));
 
-        console.log(`\n✓ FFI1: 5회 실행 완료`);
-        console.log(`  Go 라이브러리: ${uniqueGoLibs.size}/5 유니크 (${uniqueGoLibs.size === 1 ? '✓ 동일' : '✗ 차이'})`);
-        console.log(`  Rust 바이너리: ${uniqueRustBinaries.size}/5 유니크 (${uniqueRustBinaries.size === 1 ? '✓ 동일' : '✗ 차이'})`);
-        console.log(`  출력: ${uniqueOutputs.size}/5 유니크 (${uniqueOutputs.size === 1 ? '✓ 동일' : '✗ 차이'})`);
+        console.log(`\n✓ FFI1: ${FFI_CONFIG.ITERATIONS}회 실행 완료`);
+        console.log(`  Go 라이브러리: ${uniqueGoLibs.size}/${FFI_CONFIG.ITERATIONS} 유니크 (${uniqueGoLibs.size === 1 ? '✓ 동일' : '✗ 차이'})`);
+        console.log(`  Rust 바이너리: ${uniqueRustBinaries.size}/${FFI_CONFIG.ITERATIONS} 유니크 (${uniqueRustBinaries.size === 1 ? '✓ 동일' : '✗ 차이'})`);
+        console.log(`  출력: ${uniqueOutputs.size}/${FFI_CONFIG.ITERATIONS} 유니크 (${uniqueOutputs.size === 1 ? '✓ 동일' : '✗ 차이'})`);
 
-        // v1.0.1 검증: 최종 Rust 바이너리 + 출력 재현성
-        // (Go 라이브러리 자체 결정성은 v1.0.2 대상)
         if (uniqueRustBinaries.size > 0) {
-          expect(uniqueRustBinaries.size).toBe(1); // ✓ Rust 바이너리 완전 동일
+          expect(uniqueRustBinaries.size).toBe(1);
         }
         if (uniqueOutputs.size > 0) {
-          expect(uniqueOutputs.size).toBe(1); // ✓ 실행 출력 완전 동일
-          expect(runs[0].stdout).toContain('Result: 14'); // (3+4)*2 = 14
+          expect(uniqueOutputs.size).toBe(1);
+          expect(runs[0].stdout).toContain('Result: 14');
         }
 
-        // Go 라이브러리 결정성 결과 (정보용)
         console.log(`\n📊 Go 라이브러리 결정성: ${uniqueGoLibs.size === 1 ? '✓' : '⚠️ 비결정적 (v1.0.2 대상)'}`);
         console.log(`   → 최종 Rust 바이너리: ✓ 완전 결정적`);
         console.log(`   → 최종 실행 결과: ✓ 완전 동일`);
 
         recordFFIMetrics('Go+Rust FFI (FFI1)', runs);
       } finally {
-        // 정리
         tempDirs.forEach(dir => {
           try {
             fs.rmSync(dir, { recursive: true, force: true });
           } catch (e) {
-            // 무시
+            // cleanup 실패는 경고만 (일시적 파일 정도)
           }
         });
       }
@@ -252,9 +246,8 @@ fn main() {
   describe('v1.0.1 Completion', () => {
 
     test('✓ FFI 재현성 검증 완료', () => {
-      const baselineFile = path.join(__dirname, '..', 'reports', 'p5-baseline-ffi.json');
+      const baselineFile = path.join(__dirname, '..', FFI_CONFIG.BASELINE_DIR, FFI_CONFIG.BASELINE_FILE);
 
-      // 파일이 없을 수도 있음 (Go/Rust 툴체인 부재)
       if (fs.existsSync(baselineFile)) {
         const data = JSON.parse(fs.readFileSync(baselineFile, 'utf-8'));
         expect(data.length).toBeGreaterThan(0);
