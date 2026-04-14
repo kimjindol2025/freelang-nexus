@@ -1,0 +1,95 @@
+@mode(v)
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║   Math Toolkit — 수학 도구                                 ║
+// ║   🦀 Rust + ⚙️ C + 📊 Python                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── 🦀 Rust: 피보나치 (재귀)
+@lang("rust")
+@artifact("libfib.so")
+@compile("rustc --crate-type cdylib -O -o libfib.so fib.rs")
+---
+#[no_mangle]
+pub extern "C" fn fib(n: i32) -> i64 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fib(n - 1) + fib(n - 2),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn factorial(n: i32) -> i64 {
+    (1..=n as i64).product()
+}
+---
+
+// ── ⚙️ C: 삼각함수
+@lang("c")
+@artifact("libmath.so")
+@compile("gcc -shared -fPIC -O2 -o libmath.so math.c -lm")
+---
+#include <math.h>
+
+double sin_deg(double deg) {
+    return sin(deg * 3.14159 / 180.0);
+}
+
+double cos_deg(double deg) {
+    return cos(deg * 3.14159 / 180.0);
+}
+
+double pythagoras(double a, double b) {
+    return sqrt(a * a + b * b);
+}
+---
+
+// ── 📊 Python: 통계
+@mode(python)
+
+def analyze_numbers(nums):
+    import statistics
+
+    if len(nums) == 0:
+        print("No numbers!")
+        return
+
+    mean = statistics.mean(nums)
+    min_val = min(nums)
+    max_val = max(nums)
+
+    print("개수: " + str(len(nums)))
+    print("평균: " + str(mean))
+    print("최소: " + str(min_val))
+    print("최대: " + str(max_val))
+
+@mode(v)
+
+// ── 🔷 V: 오케스트레이터
+fn main() -> i64 {
+  println("╔════════════════════════════════════╗")
+  println("║  Math Toolkit — 수학 도구          ║")
+  println("╚════════════════════════════════════╝")
+
+  println("\n[Rust] 피보나치...")
+  let fib10 = fib(10)
+  println("[Rust] fib(10) = " + fib10)
+
+  let fact5 = factorial(5)
+  println("[Rust] factorial(5) = " + fact5)
+
+  println("\n[C] 삼각함수...")
+  let sin30 = sin_deg(30.0)
+  println("[C] sin(30°) ≈ " + sin30)
+
+  let hyp = pythagoras(3.0, 4.0)
+  println("[C] 빗변(3,4) = " + hyp)
+
+  println("\n[Python] 통계 분석...")
+  let data = [10.0, 20.0, 30.0, 40.0, 50.0]
+  analyze_numbers(data)
+
+  println("\n✅ 완료!")
+  return 0
+}

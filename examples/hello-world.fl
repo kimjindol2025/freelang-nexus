@@ -1,0 +1,51 @@
+@mode(v)
+
+// ╔══════════════════════════════════════════╗
+// ║   Hello World — 최소 예제                ║
+// ║   🦀 Rust + 🐍 Python                   ║
+// ╚══════════════════════════════════════════╝
+
+// ── 🦀 Rust: 문자열 반복
+@lang("rust")
+@artifact("librepeat.so")
+@compile("rustc --crate-type cdylib -O -o librepeat.so repeat.rs")
+---
+use std::ffi::CStr;
+use std::os::raw::c_char;
+
+#[no_mangle]
+pub extern "C" fn repeat_string(s: *const c_char, times: i32) -> i32 {
+    let c_str = unsafe { CStr::from_ptr(s) };
+    let text = c_str.to_str().unwrap_or("?");
+    let result = text.repeat(times as usize);
+    result.len() as i32
+}
+---
+
+// ── 🐍 Python: 간단한 인사
+@mode(python)
+
+def greet(name):
+    print("Hello, " + name + "!")
+    print("Welcome to FreeLang Nexus")
+
+@mode(v)
+
+// ── 🔷 V: 메인
+fn main() -> i64 {
+  println("╔════════════════════════════╗")
+  println("║  Hello World — Polyglot    ║")
+  println("╚════════════════════════════╝")
+
+  // Rust 함수 호출
+  println("\n[Rust] 문자열 반복...")
+  let len = repeat_string("Hi ", 3)
+  println("[Rust] 반복 결과 길이: " + len)
+
+  // Python 함수 호출
+  println("\n[Python] 인사말...")
+  greet("FreeLang")
+
+  println("\n✅ 완료!")
+  return 0
+}

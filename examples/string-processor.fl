@@ -1,0 +1,106 @@
+@mode(v)
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║   String Processor — 문자열 처리                           ║
+// ║   🐹 Go + ⚙️ C + 📊 Python                                ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── 🐹 Go: 문자열 유틸리티
+@lang("go")
+@artifact("libstring.so")
+@compile("go build -buildmode=c-shared -o libstring.so .")
+---
+package main
+
+import (
+    "C"
+    "strings"
+)
+
+//export str_length
+func str_length(s *C.char) C.int {
+    str := C.GoString(s)
+    return C.int(len(str))
+}
+
+//export str_upper
+func str_upper(s *C.char) *C.char {
+    str := C.GoString(s)
+    result := strings.ToUpper(str)
+    return C.CString(result)
+}
+
+//export str_reverse
+func str_reverse(s *C.char) *C.char {
+    str := C.GoString(s)
+    runes := []rune(str)
+    for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+        runes[i], runes[j] = runes[j], runes[i]
+    }
+    return C.CString(string(runes))
+}
+
+func main() {}
+---
+
+// ── ⚙️ C: 문자 분류
+@lang("c")
+@artifact("libchar.so")
+@compile("gcc -shared -fPIC -O2 -o libchar.so char.c")
+---
+#include <ctype.h>
+
+int count_vowels(const char *s) {
+    int count = 0;
+    for (int i = 0; s[i] != '\0'; i++) {
+        char c = tolower(s[i]);
+        if (c == 'a' || c == 'e' || c == 'i' ||
+            c == 'o' || c == 'u') {
+            count++;
+        }
+    }
+    return count;
+}
+
+int is_alphabetic(const char *s) {
+    for (int i = 0; s[i] != '\0'; i++) {
+        if (!isalpha(s[i])) return 0;
+    }
+    return 1;
+}
+---
+
+// ── 📊 Python: 단어 분석
+@mode(python)
+
+def word_frequency(text):
+    words = text.split()
+    print("단어 개수: " + str(len(words)))
+    for word in words:
+        print("  - " + word)
+
+@mode(v)
+
+// ── 🔷 V: 메인
+fn main() -> i64 {
+  println("╔════════════════════════════════════╗")
+  println("║  String Processor — 문자열 처리   ║")
+  println("╚════════════════════════════════════╝")
+
+  let test_str = "hello"
+
+  println("\n[Go] 문자열 연산...")
+  let len = str_length(test_str)
+  println("[Go] 길이: " + len)
+
+  println("\n[C] 문자 분석...")
+  let vowels = count_vowels(test_str)
+  println("[C] 모음 개수: " + vowels)
+
+  println("\n[Python] 단어 분석...")
+  let sentence = "hello world from freelang"
+  word_frequency(sentence)
+
+  println("\n✅ 완료!")
+  return 0
+}

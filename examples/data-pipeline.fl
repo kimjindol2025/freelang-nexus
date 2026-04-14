@@ -1,0 +1,99 @@
+@mode(v)
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║   Data Pipeline — 데이터 처리 파이프라인                   ║
+// ║   🦀 Rust + 🐹 Go + 📊 Python                             ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── 🦀 Rust: 데이터 생성
+@lang("rust")
+@artifact("libdata.so")
+@compile("rustc --crate-type cdylib -O -o libdata.so data.rs")
+---
+#[no_mangle]
+pub extern "C" fn generate_random(seed: i32) -> i32 {
+    let mut x = seed as u32;
+    x = x.wrapping_mul(1664525).wrapping_add(1013904223);
+    (x % 100) as i32
+}
+
+#[no_mangle]
+pub extern "C" fn sum_range(start: i32, end: i32) -> i64 {
+    let mut sum = 0i64;
+    for i in start..=end {
+        sum += i as i64;
+    }
+    sum
+}
+---
+
+// ── 🐹 Go: 데이터 필터링
+@lang("go")
+@artifact("libfilter.so")
+@compile("go build -buildmode=c-shared -o libfilter.so .")
+---
+package main
+
+import "C"
+
+//export filter_even
+func filter_even(n C.int) C.int {
+    if int(n)%2 == 0 {
+        return 1
+    }
+    return 0
+}
+
+//export multiply_by_two
+func multiply_by_two(n C.int) C.int {
+    return n * 2
+}
+
+func main() {}
+---
+
+// ── 📊 Python: 데이터 분석
+@mode(python)
+
+def analyze_array(name, values):
+    import statistics
+
+    print("\n" + name + " 분석:")
+    mean = statistics.mean(values)
+    total = sum(values)
+    print("  합계: " + str(total))
+    print("  평균: " + str(mean))
+    print("  개수: " + str(len(values)))
+
+@mode(v)
+
+// ── 🔷 V: 메이프라인 오케스트레이션
+fn main() -> i64 {
+  println("╔════════════════════════════════════════════╗")
+  println("║  Data Pipeline — 데이터 처리               ║")
+  println("╚════════════════════════════════════════════╝")
+
+  println("\n[Rust] 데이터 생성...")
+  let r1 = generate_random(42)
+  let r2 = generate_random(123)
+  let r3 = generate_random(999)
+  println("[Rust] 난수: " + r1 + ", " + r2 + ", " + r3)
+
+  println("\n[Rust] 범위 합계...")
+  let sum = sum_range(1, 10)
+  println("[Rust] sum(1..10) = " + sum)
+
+  println("\n[Go] 데이터 필터링...")
+  let is_even_r1 = filter_even(r1)
+  println("[Go] " + r1 + "는 짝수인가? " + is_even_r1)
+
+  let doubled = multiply_by_two(r1)
+  println("[Go] " + r1 + " × 2 = " + doubled)
+
+  println("\n[Python] 통계 분석...")
+  let samples = [10.0, 20.0, 30.0, 40.0, 50.0]
+  analyze_array("데이터셋", samples)
+
+  println("\n✅ 파이프라인 완료!")
+  return 0
+}
