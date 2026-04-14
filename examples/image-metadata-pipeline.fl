@@ -1,0 +1,156 @@
+@mode(v)
+
+// ╔════════════════════════════════════════════════════════════════╗
+// ║   📸 IMAGE METADATA PIPELINE — 5개 언어 혼합                  ║
+// ╠════════════════════════════════════════════════════════════════╣
+// ║   🦀 Rust  : 이미지 메타 계산                               ║
+// ║   🐹 Go    : 파일 카운팅                                    ║
+// ║   ⚙️  C     : 수학 연산 (해상도 × 채널)                     ║
+// ║   📊 Python: 통계 분석 (평균, 중앙값)                       ║
+// ║   🔷 V     : 메인 오케스트레이터                            ║
+// ╚════════════════════════════════════════════════════════════════╝
+
+// ──────────────────────────────────────────────────────────────
+// 🦀 Rust: 이미지 메타데이터 (기본값)
+// ──────────────────────────────────────────────────────────────
+@lang("rust")
+@artifact("libmetadata.so")
+@compile("rustc --crate-type cdylib -O -o libmetadata.so meta.rs")
+---
+#[no_mangle]
+pub extern "C" fn get_width() -> i32 {
+    3840
+}
+
+#[no_mangle]
+pub extern "C" fn get_height() -> i32 {
+    2160
+}
+
+#[no_mangle]
+pub extern "C" fn get_iso() -> i32 {
+    800
+}
+
+#[no_mangle]
+pub extern "C" fn get_fps() -> i32 {
+    30
+}
+---
+
+// ──────────────────────────────────────────────────────────────
+// 🐹 Go: 파일 카운트
+// ──────────────────────────────────────────────────────────────
+@lang("go")
+@artifact("libcount.so")
+@compile("go build -buildmode=c-shared -o libcount.so .")
+---
+package main
+
+import "C"
+
+//export total_files
+func total_files() C.int {
+    return 10
+}
+
+//export image_files
+func image_files() C.int {
+    return 8
+}
+
+func main() {}
+---
+
+// ──────────────────────────────────────────────────────────────
+// ⚙️ C: 이미지 수학
+// ──────────────────────────────────────────────────────────────
+@lang("c")
+@artifact("libmath.so")
+@compile("gcc -shared -fPIC -O2 -o libmath.so math.c -lm")
+---
+#include <math.h>
+
+double image_size_mb(int w, int h, int c) {
+    return (double)(w * h * c * 8) / 1000000.0;
+}
+
+double aspect_ratio(int w, int h) {
+    return (double)w / (double)h;
+}
+
+int classify(int w, int h) {
+    int mp = (w * h) / 1000000;
+    return mp < 2 ? 0 : (mp < 8 ? 1 : (mp < 33 ? 2 : 3));
+}
+---
+
+// ──────────────────────────────────────────────────────────────
+// 📊 Python: 통계 분석
+// ──────────────────────────────────────────────────────────────
+@mode(python)
+
+def stats_analyze(data):
+    import statistics
+
+    print("\n📊 통계 분석")
+    print("=" * 40)
+
+    mean = statistics.mean(data)
+    median = statistics.median(data)
+    min_val = min(data)
+    max_val = max(data)
+
+    print("개수: " + str(len(data)))
+    print("평균: " + str(mean))
+    print("중앙값: " + str(median))
+    print("최소: " + str(min_val))
+    print("최대: " + str(max_val))
+
+@mode(v)
+
+// ──────────────────────────────────────────────────────────────
+// 🔷 V: 오케스트레이터
+// ──────────────────────────────────────────────────────────────
+
+fn banner() {
+  println("╔════════════════════════════════════════╗")
+  println("║ 📸 IMAGE METADATA — 5개 언어          ║")
+  println("╠════════════════════════════════════════╣")
+  println("║ 🦀 Rust  : Meta 추출                  ║")
+  println("║ 🐹 Go    : 파일 카운트                ║")
+  println("║ ⚙️  C     : 수학 계산                  ║")
+  println("║ 📊 Python: 통계 분석                  ║")
+  println("║ 🔷 V     : 오케스트레이션            ║")
+  println("╚════════════════════════════════════════╝")
+}
+
+fn main() -> i64 {
+  banner()
+
+  println("\n[Go] 파일 스캔...")
+  let total = total_files()
+  let images = image_files()
+  println("[Go] 전체: " + total + ", 이미지: " + images)
+
+  println("\n[Rust] 메타데이터...")
+  let w = get_width()
+  let h = get_height()
+  let iso = get_iso()
+  println("[Rust] 해상도: " + w + " x " + h)
+  println("[Rust] ISO: " + iso)
+
+  println("\n[C] 수학 계산...")
+  let channels = 4
+  let size = image_size_mb(w, h, channels)
+  let ratio = aspect_ratio(w, h)
+  println("[C] 크기: " + size)
+  println("[C] 종횡비: " + ratio)
+
+  println("\n[Python] 통계...")
+  let data = [1.0, 2.0, 3.0, 4.0, 5.0]
+  stats_analyze(data)
+
+  println("\n✅ 완료!")
+  return 0
+}
