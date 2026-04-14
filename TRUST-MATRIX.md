@@ -64,16 +64,17 @@
 
 | 항목 | 현재 Level | 목표 Level | 검증 방법 | 마지막 검증 | 다음 계획 |
 |------|-----------|----------|---------|-----------|---------|
-| 에러 로케이션 (파일:줄) | ✅ Level 2 | Level 3 | 샘플 에러 메시지 | 2026-04-12 | 형식 개선 필요 |
-| 에러 설명 품질 | ⚠️ Level 1 | Level 3 | 5가지 상황 테스트 | 2026-04-10 | Failure Catalog 완성 필요 |
-| 해결책 제시 | ⚠️ Level 1 | Level 3 | 일부만 제시 | 2026-04-08 | 모든 top 20 case 커버 필요 |
-| 병렬 컴파일 실패 격리 | ❌ Level 0 | Level 3 | 미구현 | 없음 | 5월 구현 계획 |
-| 문서 링크 | ✅ Level 2 | Level 3 | 일부 링크 포함 | 2026-04-12 | 모든 에러에 링크 필요 |
+| 에러 로케이션 (파일:줄) | ✅ Level 2 | Level 3 | 샘플 에러 메시지 | 2026-04-14 | 형식 개선 필요 |
+| 에러 설명 품질 | ✅ Level 2 | Level 3 | 5가지 분류 완성 | 2026-04-14 | Failure Catalog 확대 |
+| 해결책 제시 | ✅ Level 2 | Level 3 | 5가지 case + 제안 | 2026-04-14 | top 10 case 커버 |
+| 병렬 컴파일 실패 격리 | ⚠️ Level 1 | Level 3 | [LANG] prefix 추가 | 2026-04-14 | 직접/전파 실패 구분 |
+| 문서 링크 | ✅ Level 2 | Level 3 | P1-ERROR-DIAGNOSTICS-PLAN | 2026-04-14 | 모든 에러에 링크 필요 |
 
-**현재 상태**: Level 1.0/3.0 (33%)  
-**미보장 항목**: 병렬 실패 격리, 상세 설명, top 20 case 커버
+**현재 상태**: Level 2.0/3.0 (67%)  
+**P1 완료 내용**: classifyError(5가지 분류) + formatBuildError + 20개 테스트
+**미보장 항목**: 병렬 격리 (직접 vs 전파 실패), top 10 case 완전 커버
 
-**다음 검증**: 2026-05-07 (3주, 우선순위 높음)
+**다음 검증**: 2026-05-14
 
 ---
 
@@ -101,14 +102,14 @@
 | 1. Deterministic Build | 2.8 | 93% | Windows CI 추가 |
 | 2. Stable ABI | 2.4 | 80% | 포인터 안전성 감사 |
 | 3. Type Bridge | 2.0 | 67% | Tier 분류 명확화 |
-| 4. Failure Diagnostics | 1.0 | 33% | **에러 메시징 개선** |
+| 4. Failure Diagnostics | 2.0 | 67% | **병렬 격리 개선** |
 | 5. Reproducible Exec | 1.2 | 40% | **플랫폼 검증 + 성능 기준** |
 
-**전체 평균**: Level 1.9/3.0 (**63%**)  
-**진전**: P0 Deterministic Build 1차 폐쇄로 +0.1 (60% → 63%)
+**전체 평균**: Level 2.1/3.0 (**70%**)  
+**진전**: P0 (80% → 93%) + P1 (33% → 67%) = +0.3 (60% → 70%)
 
-**가장 약한 부분**: #4 (Failure Diagnostics), #5 (Reproducible Execution)  
-**다음 우선**: P1 Error Message Enhancement (Failure Diagnostics 1.0 → 2.0 목표)
+**가장 약한 부분**: #5 (Reproducible Execution)  
+**다음 우선**: P2 Type Bridge Tier System (Type Bridge 2.0 → 2.6 목표)
 
 ---
 
