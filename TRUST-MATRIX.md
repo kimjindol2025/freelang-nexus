@@ -13,13 +13,14 @@
 | 항목 | 현재 Level | 목표 Level | 검증 방법 | 마지막 검증 | 다음 계획 |
 |------|-----------|----------|---------|-----------|---------|
 | 기본 구현 | ✅ Level 3 | Level 3 | 코드 리뷰 | 2026-04-14 | 유지 |
-| 10회 반복 빌드 해시 일치 | ⚠️ Level 2 | Level 3 | 자동 CI 테스트 | 2026-04-12 | 4월 내 Level 3 |
-| 플랫폼별 일관성 | ⚠️ Level 2 | Level 3 | Linux/macOS CI | 2026-04-10 | 5월에 Windows 추가 |
-| 캐시 무효화 | ✅ Level 2 | Level 3 | 수동 검증 | 2026-04-08 | 자동화 필요 |
-| 타임스탬프 제거 | ✅ Level 3 | Level 3 | 코드 검사 | 2026-04-14 | 유지 |
+| 10회 반복 빌드 해시 일치 | ✅ Level 3 | Level 3 | tmpFile SHA256 기반 + 테스트 | 2026-04-14 | 유지 |
+| 플랫폼별 일관성 | ⚠️ Level 2 | Level 3 | Linux/macOS CI | 2026-04-14 | 5월에 Windows 추가 |
+| 캐시 무효화 | ✅ Level 2 | Level 3 | linkFlags 정렬 검증 | 2026-04-14 | 자동화 필요 |
+| 타임스탬프 제거 | ✅ Level 3 | Level 3 | 코드 검사 (content hash) | 2026-04-14 | 유지 |
 
-**현재 상태**: Level 2.4/3.0 (80%)  
-**미보장 항목**: 모든 플랫폼에서 동일 해시 보장 아직 미달
+**현재 상태**: Level 2.8/3.0 (93%)  
+**최근 변경**: P0 Deterministic Build 1차 폐쇄 (tmpFile content hash 기반, linkFlags 정렬)
+**미보장 항목**: 플랫폼 간 완전 일관성, content 없는 fallback 경로 결정성
 
 **다음 검증**: 2026-05-14 (1개월 후)
 
@@ -97,16 +98,17 @@
 
 | 불변조건 | 평균 Level | 달성도 | 우선 작업 |
 |---------|----------|--------|---------|
-| 1. Deterministic Build | 2.4 | 80% | Windows CI 추가 |
+| 1. Deterministic Build | 2.8 | 93% | Windows CI 추가 |
 | 2. Stable ABI | 2.4 | 80% | 포인터 안전성 감사 |
 | 3. Type Bridge | 2.0 | 67% | Tier 분류 명확화 |
-| 4. Failure Diagnostics | 1.0 | 33% | **병렬 격리 + 에러 개선** |
+| 4. Failure Diagnostics | 1.0 | 33% | **에러 메시징 개선** |
 | 5. Reproducible Exec | 1.2 | 40% | **플랫폼 검증 + 성능 기준** |
 
-**전체 평균**: Level 1.8/3.0 (**60%**)
+**전체 평균**: Level 1.9/3.0 (**63%**)  
+**진전**: P0 Deterministic Build 1차 폐쇄로 +0.1 (60% → 63%)
 
 **가장 약한 부분**: #4 (Failure Diagnostics), #5 (Reproducible Execution)  
-**즉시 집중할 영역**: 에러 메시징 + 플랫폼별 재현성
+**다음 우선**: P1 Error Message Enhancement (Failure Diagnostics 1.0 → 2.0 목표)
 
 ---
 
