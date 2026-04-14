@@ -1,0 +1,35 @@
+@mode(v)
+
+@lang("go")
+---
+package main
+
+import "C"
+
+//export add
+func add(a C.int, b C.int) C.int {
+	return a + b
+}
+
+//export multiply
+func multiply(a C.int, b C.int) C.int {
+	return a * b
+}
+---
+
+@lang("rust")
+---
+#[link(name = "go_lib")]
+extern "C" {
+    fn add(a: i32, b: i32) -> i32;
+    fn multiply(a: i32, b: i32) -> i32;
+}
+---
+
+fn main() {
+    unsafe {
+        let sum = add(3, 4);
+        let prod = multiply(sum as i32, 2);
+        println!("Result: {}", prod);
+    }
+}

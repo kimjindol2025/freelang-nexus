@@ -1,0 +1,18 @@
+[
+  {
+    "testName": "Go+Rust FFI (FFI1)",
+    "mode": "ffi-go-rust",
+    "timestamp": "2026-04-14T14:41:43.426Z",
+    "runs": 5,
+    "goLibHashUnique": 5,
+    "rustBinaryHashUnique": 1,
+    "outputHashUnique": 1,
+    "allGoLibsIdentical": false,
+    "allRustBinariesIdentical": true,
+    "allOutputsIdentical": true,
+    "avgMs": 1710,
+    "minMs": 1684,
+    "maxMs": 1726,
+    "deviationPercent": 2.5
+  }
+]
