@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { CodegenResult } from '../codegen/nexus-codegen';
 import { DependencyGraph, BuildNode } from './dependency-graph';
 import { classifyError, formatBuildError, BuildError } from './build-error';
+import { FailureAnalyzer } from './failure-analyzer';
 
 export interface RunResult {
   cOutput: string;      // C 실행 결과 (stdout)
@@ -23,6 +24,8 @@ export class NexusRunner {
   // 결정적 임시 파일명을 위해 프로세스 시작 시 고정 ID + 카운터 사용
   private readonly processStartId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
   private tmpFileCounter = 0;
+  // P4: 병렬 실패 추적기
+  private failureAnalyzer: FailureAnalyzer = new FailureAnalyzer();
 
   /**
    * CodegenResult 전체 실행 (C + Python 모두)
@@ -107,8 +110,17 @@ export class NexusRunner {
     if ('error' in sortResult) {
       errors.push(`의존성 그래프 오류: ${sortResult.error}`);
     } else {
+      // P4: 모든 job 등록
+      for (const node of sortResult) {
+        const jobId = `${node.lang}#${node.artifact || 'unnamed'}`;
+        const deps = node.dependsOn?.map(dep => `${dep}#${node.artifact || 'unnamed'}`) || [];
+        this.failureAnalyzer.registerJob(jobId, node.lang, node.artifact, deps);
+      }
+
       // 빌드 순서대로 LangBlock 컴파일
       for (const node of sortResult) {
+        const jobId = `${node.lang}#${node.artifact || 'unnamed'}`;
+
         let buildCmd = node.buildCmd;
 
         // Go cgo인 경우, -buildmode=c-shared 추가
@@ -123,6 +135,10 @@ export class NexusRunner {
           langBlockWorkDir = path.join(sharedWorkDir, `lang_${node.lang}_${srcHash}`);
         }
 
+        // P4: Job 실행 시작
+        this.failureAnalyzer.updateJobStatus(jobId, 'running');
+
+        let buildOutput = { stdout: '', stderr: '' };
         const soPath = NexusRunner.buildLangBlock(
           node.lang,
           buildCmd,
@@ -133,6 +149,10 @@ export class NexusRunner {
         );
 
         if (soPath) {
+          // P4: 성공 상태 기록
+          this.failureAnalyzer.updateJobStatus(jobId, 'success');
+          this.failureAnalyzer.updateJobOutput(jobId, `Compiled ${node.artifact}`, '', buildCmd);
+
           const libDir  = path.dirname(soPath);
           const libName = path.basename(soPath).replace(/^lib/, '').replace(/\.(so|a)$/, '');
           extraFlags.push(`-L${libDir}`, `-l${libName}`);
@@ -149,6 +169,10 @@ export class NexusRunner {
             }
           }
         } else {
+          // P4: 실패 상태 기록 (stderr는 buildLangBlock 콘솔 출력에서 나옴)
+          this.failureAnalyzer.updateJobStatus(jobId, 'failed', 1);
+          this.failureAnalyzer.updateJobOutput(jobId, '', `Build failed for ${node.artifact}`, buildCmd);
+
           // P1: 빌드 실패 메시지 개선 (상세는 buildLangBlock 콘솔 출력 참고)
           errors.push(`[${node.lang.toUpperCase()}] 빌드 실패 — 위의 stderr 메시지를 참고하세요`);
         }
@@ -177,6 +201,13 @@ export class NexusRunner {
         const { classification, suggestion } = classifyError('python', errorMsg, 1);
         errors.push(`[Python] 실행 에러 (${classification}): ${suggestion}`);
       }
+    }
+
+    // P4: 최종 병렬 실패 분석 및 리포트
+    const analysis = this.failureAnalyzer.analyzeFailures();
+    if (analysis.hasFailures) {
+      const failureReport = this.failureAnalyzer.formatFailureReport();
+      console.error('\n' + failureReport);
     }
 
     return { cOutput, pythonOutput, errors };
