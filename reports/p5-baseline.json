@@ -1,0 +1,130 @@
+[
+  {
+    "testName": "Rust single (R1)",
+    "avgMs": 1226,
+    "minMs": 1202,
+    "maxMs": 1286,
+    "deviationPercent": 6.8,
+    "timestamp": "2026-04-14T14:03:44.555Z"
+  },
+  {
+    "testName": "Go + Rust multi (R2)",
+    "avgMs": 1874,
+    "minMs": 1805,
+    "maxMs": 1941,
+    "deviationPercent": 7.3,
+    "timestamp": "2026-04-14T14:03:44.560Z"
+  },
+  {
+    "testName": "Rust single (P1)",
+    "avgMs": 1219,
+    "minMs": 1146,
+    "maxMs": 1270,
+    "deviationPercent": 10.2,
+    "timestamp": "2026-04-14T14:03:44.570Z"
+  },
+  {
+    "testName": "Go + Rust multi (P2)",
+    "avgMs": 1737,
+    "minMs": 1663,
+    "maxMs": 1875,
+    "deviationPercent": 12.2,
+    "timestamp": "2026-04-14T14:03:44.572Z"
+  },
+  {
+    "testName": "Rust single (R1)",
+    "avgMs": 1236,
+    "minMs": 1201,
+    "maxMs": 1280,
+    "deviationPercent": 6.4,
+    "timestamp": "2026-04-14T14:05:02.181Z"
+  },
+  {
+    "testName": "Go + Rust multi (R2)",
+    "avgMs": 1863,
+    "minMs": 1802,
+    "maxMs": 1939,
+    "deviationPercent": 7.4,
+    "timestamp": "2026-04-14T14:05:02.184Z"
+  },
+  {
+    "testName": "Rust single (P1)",
+    "avgMs": 1226,
+    "minMs": 1167,
+    "maxMs": 1274,
+    "deviationPercent": 8.7,
+    "timestamp": "2026-04-14T14:05:02.187Z"
+  },
+  {
+    "testName": "Go + Rust multi (P2)",
+    "avgMs": 1730,
+    "minMs": 1679,
+    "maxMs": 1790,
+    "deviationPercent": 6.4,
+    "timestamp": "2026-04-14T14:05:02.189Z"
+  },
+  {
+    "testName": "Rust single (R1)",
+    "avgMs": 1262,
+    "minMs": 1209,
+    "maxMs": 1290,
+    "deviationPercent": 6.4,
+    "timestamp": "2026-04-14T14:05:45.188Z"
+  },
+  {
+    "testName": "Go + Rust multi (R2)",
+    "avgMs": 1879,
+    "minMs": 1805,
+    "maxMs": 1939,
+    "deviationPercent": 7.1,
+    "timestamp": "2026-04-14T14:05:45.192Z"
+  },
+  {
+    "testName": "Rust single (P1)",
+    "avgMs": 1172,
+    "minMs": 1137,
+    "maxMs": 1199,
+    "deviationPercent": 5.3,
+    "timestamp": "2026-04-14T14:05:45.196Z"
+  },
+  {
+    "testName": "Go + Rust multi (P2)",
+    "avgMs": 1832,
+    "minMs": 1743,
+    "maxMs": 1893,
+    "deviationPercent": 8.2,
+    "timestamp": "2026-04-14T14:05:45.198Z"
+  },
+  {
+    "testName": "Rust single (R1)",
+    "avgMs": 1254,
+    "minMs": 1208,
+    "maxMs": 1299,
+    "deviationPercent": 7.3,
+    "timestamp": "2026-04-14T14:05:57.624Z"
+  },
+  {
+    "testName": "Go + Rust multi (R2)",
+    "avgMs": 1877,
+    "minMs": 1830,
+    "maxMs": 1941,
+    "deviationPercent": 5.9,
+    "timestamp": "2026-04-14T14:05:57.629Z"
+  },
+  {
+    "testName": "Rust single (P1)",
+    "avgMs": 1195,
+    "minMs": 1143,
+    "maxMs": 1291,
+    "deviationPercent": 12.4,
+    "timestamp": "2026-04-14T14:05:57.634Z"
+  },
+  {
+    "testName": "Go + Rust multi (P2)",
+    "avgMs": 1822,
+    "minMs": 1740,
+    "maxMs": 1917,
+    "deviationPercent": 9.7,
+    "timestamp": "2026-04-14T14:05:57.636Z"
+  }
+]

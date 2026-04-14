@@ -1,0 +1,23 @@
+@mode(v)
+
+@lang("rust")
+---
+#[no_mangle]
+pub extern "C" fn multiply(x: i32, y: i32) -> i32 {
+  x * y
+}
+---
+
+@lang("go")
+---
+//export process
+func process(x C.int) C.int {
+  return C.int(x * 2)
+}
+---
+
+fn main() {
+  let a = multiply(3, 4);
+  let b = process(a as i32);
+  println!("Result: {}", b);
+}
