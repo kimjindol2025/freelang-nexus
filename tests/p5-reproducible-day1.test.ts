@@ -5,11 +5,10 @@
  * 검증: 재현성 + 성능 baseline
  */
 
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { sha256 } from './utils';
 
-// 간단한 mock runner (실제로는 NexusRunner 사용)
 interface RunResult {
   cOutput: string;
   pythonOutput: string;
@@ -21,10 +20,6 @@ interface PerformanceRun {
   timeMs: number;
   hash: string;
   output: string;
-}
-
-function sha256(data: string): string {
-  return crypto.createHash('sha256').update(data).digest('hex');
 }
 
 function recordMetrics(testName: string, runs: PerformanceRun[]): void {
@@ -45,11 +40,8 @@ function recordMetrics(testName: string, runs: PerformanceRun[]): void {
 
   console.log(report);
 
-  // baseline 파일에 기록
   const baselineDir = path.join(__dirname, '..', 'reports');
-  if (!fs.existsSync(baselineDir)) {
-    fs.mkdirSync(baselineDir, { recursive: true });
-  }
+  fs.mkdirSync(baselineDir, { recursive: true });
 
   const baseline = {
     testName,

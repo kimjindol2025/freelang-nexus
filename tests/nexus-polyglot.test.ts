@@ -15,29 +15,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
 import { NexusLexer } from '../src/nexus/lexer/nexus-lexer';
 import { NexusParser } from '../src/nexus/parser/nexus-parser';
 import { NexusCodegen } from '../src/nexus/codegen/nexus-codegen';
 import { NexusRunner } from '../src/nexus/runtime/nexus-runner';
-
-// ─── 환경 감지 ──────────────────────────────────────────────────────────────
-
-function hasRustc(): boolean {
-  try { execSync('rustc --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasGcc(): boolean {
-  try { execSync('gcc --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasGo(): boolean {
-  try { execSync('go version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasZig(): boolean {
-  try { execSync('zig version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasPython3(): boolean {
-  try { execSync('python3 --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
+import { env } from './utils';
 
 // ─── 헬퍼 ──────────────────────────────────────────────────────────────────
 
@@ -147,7 +129,7 @@ describe('🌍 Polyglot — 10개 언어 완전 통합', () => {
 
   // ── Python 단독 실행 ──────────────────────────────────────────────────────
 
-  (hasPython3() ? test : test.skip)(
+  (env.hasPython3() ? test : test.skip)(
     'PG-10: Python 통계 실행 → statistics 출력', () => {
       const result = compile(polyglotSrc);
       const runner = new NexusRunner();
@@ -159,7 +141,7 @@ describe('🌍 Polyglot — 10개 언어 완전 통합', () => {
 
   // ── Rust + C + Go + Zig E2E ─────────────────────────────────────────────────
 
-  (hasRustc() && hasGcc() && hasGo() && hasZig() ? test : test.skip)(
+  (env.hasRustc() && env.hasGcc() && env.hasGo() && env.hasZig() ? test : test.skip)(
     'PG-11: 전체 통합 E2E 실행 — polyglot-demo.fl', () => {
       const result = compile(polyglotSrc);
       const runner = new NexusRunner();

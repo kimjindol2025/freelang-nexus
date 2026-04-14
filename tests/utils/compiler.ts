@@ -1,12 +1,9 @@
-import { Lexer } from '../lexer/nexus-lexer';
-import { Parser } from '../parser/nexus-parser';
-import { NexusCodegen } from '../codegen/nexus-codegen';
+import { NexusLexer } from '../../src/nexus/lexer/nexus-lexer';
+import { NexusParser } from '../../src/nexus/parser/nexus-parser';
+import { NexusCodegen } from '../../src/nexus/codegen/nexus-codegen';
 
-export function compile(source: string): string {
-  const lexer = new Lexer(source);
-  const tokens = lexer.tokenize();
-  const parser = new Parser(tokens);
-  const ast = parser.parse();
-  const codegen = new NexusCodegen(ast);
-  return codegen.generate();
+export function compile(source: string) {
+  const tokens = new NexusLexer(source).tokenize();
+  const ast = new NexusParser(tokens).parse();
+  return new NexusCodegen().generateProgram(ast);
 }

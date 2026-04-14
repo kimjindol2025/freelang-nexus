@@ -14,21 +14,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { execSync } from 'child_process';
 import { NexusLexer } from '../src/nexus/lexer/nexus-lexer';
 import { NexusParser } from '../src/nexus/parser/nexus-parser';
 import { NexusCodegen } from '../src/nexus/codegen/nexus-codegen';
 import { NexusRunner } from '../src/nexus/runtime/nexus-runner';
-
-// ─── 환경 감지 ──────────────────────────────────────────────────────────────
-
-function hasGcc(): boolean {
-  try { execSync('gcc --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-
-function hasPython3(): boolean {
-  try { execSync('python3 --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
+import { env } from './utils';
 
 // ─── 헬퍼: 컴파일 ──────────────────────────────────────────────────────────────
 
@@ -45,7 +35,7 @@ describe('P0 — Deterministic Build (결정적 빌드)', () => {
   describe('tmpFile determinism (내용 기반 해시)', () => {
 
     test('D1: 같은 C 코드 → 같은 임시 파일명', () => {
-      if (!hasGcc()) {
+      if (!env.hasGcc()) {
         console.log('⊙ gcc not found, skipping D1');
         return;
       }
@@ -81,7 +71,7 @@ describe('P0 — Deterministic Build (결정적 빌드)', () => {
     });
 
     test('D2: 다른 C 코드 → 다른 임시 파일명', () => {
-      if (!hasGcc()) {
+      if (!env.hasGcc()) {
         console.log('⊙ gcc not found, skipping D2');
         return;
       }
@@ -97,7 +87,7 @@ describe('P0 — Deterministic Build (결정적 빌드)', () => {
     });
 
     test('D3: 같은 Python 코드 → 같은 임시 파일명', () => {
-      if (!hasPython3()) {
+      if (!env.hasPython3()) {
         console.log('⊙ python3 not found, skipping D3');
         return;
       }

@@ -13,24 +13,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
 import { NexusLexer } from '../src/nexus/lexer/nexus-lexer';
 import { NexusParser } from '../src/nexus/parser/nexus-parser';
 import { NexusCodegen } from '../src/nexus/codegen/nexus-codegen';
 import { NexusRunner } from '../src/nexus/runtime/nexus-runner';
-
-function hasRustc(): boolean {
-  try { execSync('rustc --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasGo(): boolean {
-  try { execSync('go version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasGcc(): boolean {
-  try { execSync('gcc --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
-function hasPython3(): boolean {
-  try { execSync('python3 --version', { stdio: 'pipe' }); return true; } catch { return false; }
-}
+import { env } from './utils';
 
 function compile(source: string) {
   const tokens = new NexusLexer(source).tokenize();

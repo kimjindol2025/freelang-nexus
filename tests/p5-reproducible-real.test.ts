@@ -7,18 +7,12 @@
  * 이 테스트는 simulation 기반 P5 Day 1을 실제 실행으로 확장
  */
 
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, spawnSync } from 'child_process';
 import { NexusRunner } from '../src/nexus/runtime/nexus-runner';
-
-function sha256(data: string | Buffer): string {
-  if (typeof data === 'string') {
-    return crypto.createHash('sha256').update(data).digest('hex');
-  }
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
+import { sha256 } from './utils';
+import { TempDirManager } from './utils';
 
 interface RealRun {
   runIndex: number;
@@ -58,11 +52,8 @@ function recordRealMetrics(testName: string, runs: RealRun[]): void {
 
   console.log(report);
 
-  // baseline 확장 (실제 데이터)
   const baselineDir = path.join(__dirname, '..', 'reports');
-  if (!fs.existsSync(baselineDir)) {
-    fs.mkdirSync(baselineDir, { recursive: true });
-  }
+  fs.mkdirSync(baselineDir, { recursive: true });
 
   const realMetric = {
     testName,
@@ -108,13 +99,11 @@ fn main() {
 `;
 
       const runs: RealRun[] = [];
-      const tempDirs: string[] = [];
+      const manager = new TempDirManager();
 
       try {
-        // 5회 반복: 독립적인 임시 디렉토리에서 각각 컴파일
         for (let i = 0; i < 5; i++) {
-          const workDir = path.join(__dirname, '..', '.tmp', `p5_rust_run_${i}_${Date.now()}`);
-          tempDirs.push(workDir);
+          const workDir = manager.create('p5_rust_run_');
 
           const start = Date.now();
 
@@ -169,14 +158,7 @@ fn main() {
 
         recordRealMetrics('Rust 단일 (RT1)', runs);
       } finally {
-        // 임시 디렉토리 정리
-        tempDirs.forEach(dir => {
-          try {
-            fs.rmSync(dir, { recursive: true, force: true });
-          } catch (e) {
-            // 무시
-          }
-        });
+        manager.cleanup();
       }
     });
 
@@ -194,12 +176,11 @@ fn main() {
 `;
 
       const runs: RealRun[] = [];
-      const tempDirs: string[] = [];
+      const manager = new TempDirManager();
 
       try {
         for (let i = 0; i < 5; i++) {
-          const workDir = path.join(__dirname, '..', '.tmp', `p5_rust_multiply_${i}_${Date.now()}`);
-          tempDirs.push(workDir);
+          const workDir = manager.create('p5_rust_multiply_');
 
           const start = Date.now();
 
@@ -245,13 +226,7 @@ fn main() {
 
         recordRealMetrics('Rust 계산 (RT2)', runs);
       } finally {
-        tempDirs.forEach(dir => {
-          try {
-            fs.rmSync(dir, { recursive: true, force: true });
-          } catch (e) {
-            // 무시
-          }
-        });
+        manager.cleanup();
       }
     });
 
@@ -266,12 +241,11 @@ fn main() {
 `;
 
       const results: { stdout: string; stderr: string }[] = [];
-      const tempDirs: string[] = [];
+      const manager = new TempDirManager();
 
       try {
         for (let i = 0; i < 3; i++) {
-          const workDir = path.join(__dirname, '..', '.tmp', `p5_rust_stderr_${i}_${Date.now()}`);
-          tempDirs.push(workDir);
+          const workDir = manager.create('p5_rust_stderr_');
 
           const sourceFile = path.join(workDir, 'main.rs');
           fs.mkdirSync(workDir, { recursive: true });
@@ -299,13 +273,7 @@ fn main() {
         console.log(`  stdout: "${results[0].stdout.trim()}"`);
         console.log(`  stderr: "${results[0].stderr.trim()}"`);
       } finally {
-        tempDirs.forEach(dir => {
-          try {
-            fs.rmSync(dir, { recursive: true, force: true });
-          } catch (e) {
-            // 무시
-          }
-        });
+        manager.cleanup();
       }
     });
   });
