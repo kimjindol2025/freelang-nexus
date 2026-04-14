@@ -1,0 +1,36 @@
+[
+  {
+    "testName": "Rust 단일 (RT1)",
+    "mode": "real-runner",
+    "timestamp": "2026-04-14T14:09:50.341Z",
+    "runs": 5,
+    "binaryHashUnique": 1,
+    "allBinariesIdentical": true,
+    "outputHashUnique": 1,
+    "allOutputsIdentical": true,
+    "avgMs": 437,
+    "minMs": 420,
+    "maxMs": 464,
+    "deviationPercent": 10.1,
+    "sampleBinaryHash": "55f7e5d9c07807362b26db1ad2e3f525055b851618732d44c719e59191801ad6",
+    "sampleStdoutHash": "912cd34cb75f31dda738dd5708fce33a938d834dc8c19d6c4c119c533721cd65",
+    "sampleOutput": "Result: 5\n"
+  },
+  {
+    "testName": "Rust 계산 (RT2)",
+    "mode": "real-runner",
+    "timestamp": "2026-04-14T14:09:52.459Z",
+    "runs": 5,
+    "binaryHashUnique": 1,
+    "allBinariesIdentical": true,
+    "outputHashUnique": 1,
+    "allOutputsIdentical": true,
+    "avgMs": 418,
+    "minMs": 408,
+    "maxMs": 442,
+    "deviationPercent": 8.1,
+    "sampleBinaryHash": "c74442f0e0b91f0413db43da9fced5a59f407f76c345beb50940c814e1248fd7",
+    "sampleStdoutHash": "36c0879225a79f78e9ba8766a68f1f7578b1076361a6c900fbca23228fdeb0a6",
+    "sampleOutput": "Result: 24\n"
+  }
+]
