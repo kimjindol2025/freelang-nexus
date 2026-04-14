@@ -233,7 +233,7 @@ FreeLang Nexus 컴파일러를 GitHub에 공개했습니다.
 핵심 아이디어는 공유하면서도 
 구현 세부사항은 보호합니다.
 
-🤖 이 글은 Claude Code가 작성했습니다.
+**저자**: kimjindol | **AI 참여**: Claude Code
 ```
 
 ## 🎁 다음 단계

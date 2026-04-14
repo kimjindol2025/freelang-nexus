@@ -2,6 +2,9 @@
 
 Welcome! We appreciate your interest in contributing to FreeLang Nexus.
 
+**Project Lead**: kimjindol  
+**AI Development**: Claude Code
+
 ## Development Setup
 
 ```bash

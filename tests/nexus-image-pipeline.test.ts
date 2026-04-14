@@ -1,6 +1,8 @@
 /**
  * FreeLang Nexus — 이미지 메타데이터 파이프라인 테스트
  *
+ * 작성자: kimjindol | 참여: Claude Code
+ *
  * 📸 5개 언어 혼합 파이프라인
  *   - 🦀 Rust  : EXIF 메타데이터 파싱
  *   - 🐹 Go    : 파일시스템 순회

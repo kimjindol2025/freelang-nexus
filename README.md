@@ -190,9 +190,10 @@ Minesweeper (4언어):  통과
 
 MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
 
-## 👤 저자
+## 👤 저자 및 참여
 
-**Claude Code** - AI-driven language compiler development
+**저자**: kimjindol  
+**참여**: Claude Code - AI-driven language compiler development
 
 ---
 

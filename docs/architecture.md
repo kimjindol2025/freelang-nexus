@@ -1,5 +1,7 @@
 # FreeLang Nexus — 아키텍처 설계
 
+**저자**: kimjindol | **참여**: Claude Code
+
 ## 개요
 
 FreeLang Nexus는 **단일 `.fl` 파일에서 여러 언어의 native 구현을 혼합 작성하고, 자동으로 FFI(Foreign Function Interface)를 생성하여 컴파일·링크하는 다중언어 컴파일러**입니다.

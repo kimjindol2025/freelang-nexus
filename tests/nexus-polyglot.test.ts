@@ -1,6 +1,8 @@
 /**
  * FreeLang Nexus — Polyglot 통합 테스트
  *
+ * 작성자: kimjindol | 참여: Claude Code
+ *
  * 🌍 POLYGLOT DEMO 실행 검증
  *   - 🦀 Rust  : PCG RNG (extern "C" fn)
  *   - ⚙️  C     : 수학 함수 + -lm 링크
