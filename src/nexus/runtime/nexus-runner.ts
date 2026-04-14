@@ -10,6 +10,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { CodegenResult } from '../codegen/nexus-codegen';
 import { DependencyGraph, BuildNode } from './dependency-graph';
+import { classifyError, formatBuildError, BuildError } from './build-error';
 
 export interface RunResult {
   cOutput: string;      // C 실행 결과 (stdout)
@@ -148,7 +149,8 @@ export class NexusRunner {
             }
           }
         } else {
-          errors.push(`${node.lang} 빌드 실패: ${buildCmd}`);
+          // P1: 빌드 실패 메시지 개선 (상세는 buildLangBlock 콘솔 출력 참고)
+          errors.push(`[${node.lang.toUpperCase()}] 빌드 실패 — 위의 stderr 메시지를 참고하세요`);
         }
       }
     }
@@ -160,7 +162,9 @@ export class NexusRunner {
         const allFlags = [...(result.linkFlags || []), ...extraFlags].sort();
         cOutput = this.runC(result.c, allFlags);
       } catch (e) {
-        errors.push(`C 컴파일/실행 에러: ${(e as Error).message}`);
+        const errorMsg = (e as Error).message;
+        const { classification, suggestion } = classifyError('c', errorMsg, 1);
+        errors.push(`[C] 컴파일/실행 에러 (${classification}): ${suggestion}`);
       }
     }
 
@@ -169,7 +173,9 @@ export class NexusRunner {
       try {
         pythonOutput = this.runPython(result.python);
       } catch (e) {
-        errors.push(`Python 실행 에러: ${(e as Error).message}`);
+        const errorMsg = (e as Error).message;
+        const { classification, suggestion } = classifyError('python', errorMsg, 1);
+        errors.push(`[Python] 실행 에러 (${classification}): ${suggestion}`);
       }
     }
 
@@ -489,6 +495,25 @@ func main() {}
       if (fs.existsSync(soPath)) return soPath;
       return null;
     } catch (e) {
+      // P1: 에러 분류 및 제안 (stderr는 제한적으로만 캡처 가능)
+      const error = e as any;
+      const stderrMsg = error.message || '';
+      const exitCode = error.status || 1;
+
+      const { classification, suggestion } = classifyError(lang, stderrMsg, exitCode);
+
+      const buildErr: BuildError = {
+        lang,
+        command: buildCmd,
+        exitCode,
+        stderr: stderrMsg,
+        classification,
+        suggestion
+      };
+
+      // 콘솔에 상세 에러 출력
+      console.error('\n' + formatBuildError(buildErr) + '\n');
+
       return null;
     }
   }
