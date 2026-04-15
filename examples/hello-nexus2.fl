@@ -1,24 +1,16 @@
 @mode(v)
 
-// ╔══════════════════════════════════════════╗
-// ║   Nexus 2 — Multi-language Example      ║
-// ║   🦀 Rust + 🐍 Python → FreeLang v9     ║
-// ╚══════════════════════════════════════════╝
-
-// ── 🦀 Rust: 간단한 계산
 @lang("rust")
 ---
 #[no_mangle]
 pub extern "C" fn double_it(x: i32) -> i32 { x * 2 }
 ---
 
-// ── 🐍 Python: 인사말
 @mode(python)
 
 def greet(name):
     print("Hello from Python: " + name)
 
-// ── 🔷 V: 메인 오케스트레이터
 @mode(v)
 
 fn main() -> i64 {

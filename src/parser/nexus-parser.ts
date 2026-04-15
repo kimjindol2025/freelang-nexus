@@ -3,7 +3,7 @@
  * V 모드 + Python 모드 함수를 혼합하여 파싱
  */
 
-import { Token, TokenType } from '../lexer/token';
+import { Token, TokenType } from './token';
 import * as AST from './ast';
 
 export class NexusParser {

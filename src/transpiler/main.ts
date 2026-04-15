@@ -4,15 +4,11 @@
  * AST에서 언어 블록을 추출하고 각각을 FreeLang v9로 변환
  */
 
-import {
-  ExportedFunction,
-  extractRustFunctions,
-  extractGoFunctions,
-  extractCFunctions,
-  extractPythonFunctions,
-  generateFlvSignature,
-  transpileBody,
-} from './base';
+import { ExportedFunction, generateFlvSignature, transpileBody } from './base';
+import { transpileRustFunctions } from './rust-to-fl';
+import { transpileGoFunctions } from './go-to-fl';
+import { transpileseFunctions } from './c-to-fl';
+import { transpilepythonFunctions } from './python-to-fl';
 
 export interface TranspiledResult {
   functions: ExportedFunction[];
@@ -36,17 +32,17 @@ export function transpilePolyglot(ast: any): TranspiledResult {
       let extracted: ExportedFunction[] = [];
       switch (lang) {
         case 'rust':
-          extracted = extractRustFunctions(sourceCode);
+          extracted = transpileRustFunctions(sourceCode);
           break;
         case 'go':
-          extracted = extractGoFunctions(sourceCode);
+          extracted = transpileGoFunctions(sourceCode);
           break;
         case 'c':
         case 'cpp':
-          extracted = extractCFunctions(sourceCode);
+          extracted = transpileseFunctions(sourceCode);
           break;
         case 'python':
-          extracted = extractPythonFunctions(sourceCode);
+          extracted = transpilepythonFunctions(sourceCode);
           break;
       }
 
@@ -64,7 +60,7 @@ export function transpilePolyglot(ast: any): TranspiledResult {
   const transpiledFunctions = functions.map(fn => ({
     ...fn,
     flv9Sig: generateFlvSignature(fn),
-    flv9Body: transpileBody(fn.lang, fn.body),
+    flv9Body: fn.body, // 이미 트랜스파일된 body
   }));
 
   return {
