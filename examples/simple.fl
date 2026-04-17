@@ -1,0 +1,51 @@
+@mode(v)
+
+@lang("rust")
+---
+#[no_mangle]
+pub extern "C" fn add(x: i32, y: i32) -> i32 { x + y }
+
+#[no_mangle]
+pub extern "C" fn multiply(x: i32, y: i32) -> i32 { x * y }
+
+#[no_mangle]
+pub extern "C" fn subtract(x: i32, y: i32) -> i32 { x - y }
+---
+
+@lang("go")
+---
+//export divide
+func divide(a int, b int) int { return a / b }
+
+//export modulo
+func modulo(a int, b int) int { return a % b }
+---
+
+@lang("c")
+---
+int square(int x) { return x * x; }
+int cube(int x) { return x * x * x; }
+int negate(int x) { return -x; }
+---
+
+@lang("python")
+---
+def double(x):
+    return x * 2
+
+def triple(x):
+    return x * 3
+
+def half(x):
+    return x / 2
+---
+
+@mode(v)
+
+fn calc() -> i64 {
+  let a = add(10, 5)
+  let m = multiply(4, 3)
+  let d = divide(20, 4)
+  let s = square(5)
+  return 0
+}

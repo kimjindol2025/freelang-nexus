@@ -1,0 +1,94 @@
+@mode(v)
+
+@lang("rust")
+---
+#[no_mangle]
+pub extern "C" fn factorial(n: i32) -> i32 {
+  if n <= 1 { return 1 }
+  return n * factorial(n - 1)
+}
+
+#[no_mangle]
+pub extern "C" fn sum_range(from: i32, to: i32) -> i32 {
+  let mut total = 0;
+  let mut i = from;
+  while i <= to {
+    total = total + i;
+    i = i + 1;
+  }
+  return total;
+}
+---
+
+@lang("go")
+---
+//export fibonacci
+func fibonacci(n int) int {
+  if n <= 1 {
+    return n
+  }
+  return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+//export gcd
+func gcd(a int, b int) int {
+  if b == 0 {
+    return a
+  }
+  return gcd(b, a % b)
+}
+---
+
+@lang("c")
+---
+int max(int a, int b) {
+  if (a > b) return a;
+  return b;
+}
+
+int min(int a, int b) {
+  if (a < b) return a;
+  return b;
+}
+
+int power(int x, int n) {
+  int result = 1;
+  for (int i = 0; i < n; i++) {
+    result = result * x;
+  }
+  return result;
+}
+---
+
+@lang("python")
+---
+def absolute(x):
+    if x < 0:
+        return -x
+    return x
+
+def is_even(n):
+    return n % 2 == 0
+
+def is_prime(n):
+    if n < 2:
+        return False
+    for i in range(2, n):
+        if n % i == 0:
+            return False
+    return True
+---
+
+@mode(v)
+
+fn run_tests() -> i64 {
+  let f5 = factorial(5)
+  let s = sum_range(1, 10)
+  let fib = fibonacci(6)
+  let g = gcd(48, 18)
+  let m = max(10, 20)
+  let mn = min(10, 20)
+  let p = power(2, 8)
+  let a = absolute(-42)
+  return 0
+}
