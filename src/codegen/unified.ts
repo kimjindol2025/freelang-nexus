@@ -1,202 +1,182 @@
-/**
- * FreeLang Nexus 2 — S-expression 코드 생성기
- *
- * 트랜스파일된 함수들을 FreeLang v9 S-expression 포맷으로 생성
- */
-
 import { TranspiledResult } from '../transpiler/main';
 import { ExportedFunction, mapType, transpileBody } from '../transpiler/base';
 
-/**
- * S-expression으로 변환된 함수 본체
- */
-function toSExpression(lang: string, body: string): string {
-  let result = body.trim();
-
-  // 1. return 문 제거
-  result = result.replace(/^\s*return\s+/, '').replace(/;$/, '');
-
-  // 2. 언어별 body 변환 (operator를 S-expression으로)
-  result = transpileBody(lang, result);
-
-  // 3. 기본 연산자를 S-expression으로 변환
-  result = convertToSExpression(result);
-
-  return result;
+function toSExpr(l: string, b: string): string {
+  let r = b.trim().replace(/^\s*return\s+/, '').replace(/;$/, '');
+  r = transpileBody(l, r);
+  r = cvtSExpr(r);
+  return r;
 }
 
-/**
- * C-like 표현을 S-expression으로 변환
- * 예: "x * 2" → "(* $x 2)"
- *     "a + b" → "(+ $a $b)"
- */
-function convertToSExpression(expr: string): string {
-  let result = expr.trim();
+function cvtSExpr(e: string): string {
+  let r = e.trim().replace(/;$/, '');
 
-  // 세미콜론 제거
-  result = result.replace(/;$/, '');
+  r = addDol(r);
+  r = cvtBinOp(r);
+  r = cvtFunc(r);
 
-  // Step 1: 변수명 앞에 $ 추가 (문자로 시작하는 identifier, 문자열 외부)
-  result = addDollarPrefix(result);
-
-  // Step 2: 이항 연산자를 S-expression으로 변환
-  result = convertBinaryOps(result);
-
-  // Step 3: 함수 호출을 S-expression으로 변환
-  result = convertFunctionCalls(result);
-
-  return result;
+  return r;
 }
 
-/**
- * 변수 이름 앞에 $ 추가
- * 숫자 리터럴, 문자열, 예약어는 제외
- */
-function addDollarPrefix(expr: string): string {
-  // 문자열 내부는 보호 (간단히: "..."와 '...'는 그대로 둠)
-  let result = '';
-  let inString = false;
-  let stringChar = '';
+function addDol(e: string): string {
+  let r = '';
+  let inS = false;
+  let sC = '';
 
-  for (let i = 0; i < expr.length; i++) {
-    const char = expr[i];
-
-    // 문자열 시작/종료 감지
-    if ((char === '"' || char === "'") && (i === 0 || expr[i - 1] !== '\\')) {
-      if (!inString) {
-        inString = true;
-        stringChar = char;
-        result += char;
-      } else if (char === stringChar) {
-        inString = false;
-        result += char;
+  for (let i = 0; i < e.length; i++) {
+    const ch = e[i];
+    if ((ch === '"' || ch === "'") && (i === 0 || e[i - 1] !== '\\')) {
+      if (!inS) {
+        inS = true;
+        sC = ch;
+        r += ch;
+      } else if (ch === sC) {
+        inS = false;
+        r += ch;
       } else {
-        result += char;
+        r += ch;
       }
-    } else if (inString) {
-      // 문자열 내부이면 그대로
-      result += char;
+    } else if (inS) {
+      r += ch;
     } else {
-      // 문자열 외부: 변수명 앞에 $ 추가
-      result += char;
+      r += ch;
     }
   }
 
-  // 정규식: 단어 경계에서 이미 $가 없는 identifier에 $ 추가
-  result = result.replace(/\b([a-zA-Z_]\w*)\b/g, (match) => {
-    if (/^\d|^return$|^if$|^while$|^let$|^fn$|^println$|^print$|^true$|^false$/.test(match)) {
-      return match;
+  r = r.replace(/\b([a-zA-Z_]\w*)\b/g, (m) => {
+    if (/^\d|^return$|^if$|^while$|^let$|^fn$|^println$|^print$|^true$|^false$/.test(m)) {
+      return m;
     }
-    if (match.startsWith('$')) {
-      return match;
+    if (m.startsWith('$')) {
+      return m;
     }
-    return '$' + match;
+    return '$' + m;
   });
 
-  return result;
+  return r;
 }
 
-/**
- * 이항 연산자를 S-expression으로 변환
- */
-function convertBinaryOps(expr: string): string {
-  let result = expr;
+function cvtBinOp(e: string): string {
+  let r = e;
 
-  // 비교 연산자 (길이 긴 것부터)
-  result = result.replace(/(\$\w+)\s*>=\s*(\$?\w+)/g, '(>= $1 $2)');
-  result = result.replace(/(\$\w+)\s*<=\s*(\$?\w+)/g, '(<= $1 $2)');
-  result = result.replace(/(\$\w+)\s*==\s*(\$?\w+)/g, '(= $1 $2)');
-  result = result.replace(/(\$\w+)\s*!=\s*(\$?\w+)/g, '(!= $1 $2)');
-  result = result.replace(/(\$\w+)\s*>\s*(\$?\w+)/g, '(> $1 $2)');
-  result = result.replace(/(\$\w+)\s*<\s*(\$?\w+)/g, '(< $1 $2)');
+  r = r.replace(/(\$\w+)\s*>=\s*(\$?\w+)/g, '(>= $1 $2)');
+  r = r.replace(/(\$\w+)\s*<=\s*(\$?\w+)/g, '(<= $1 $2)');
+  r = r.replace(/(\$\w+)\s*==\s*(\$?\w+)/g, '(= $1 $2)');
+  r = r.replace(/(\$\w+)\s*!=\s*(\$?\w+)/g, '(!= $1 $2)');
+  r = r.replace(/(\$\w+)\s*>\s*(\$?\w+)/g, '(> $1 $2)');
+  r = r.replace(/(\$\w+)\s*<\s*(\$?\w+)/g, '(< $1 $2)');
 
-  // 산술 연산자 (higher precedence 먼저)
-  result = result.replace(/(\$?\w+)\s*\*\s*(\$?\w+)/g, '(* $1 $2)');
-  result = result.replace(/(\$?\w+)\s*\/\s*(\$?\w+)/g, '(/ $1 $2)');
-  result = result.replace(/(\$?\w+)\s*\+\s*(\$?\w+)/g, '(+ $1 $2)');
-  result = result.replace(/(\$?\w+)\s*-\s*(\$?\w+)/g, '(- $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\*\s*(\$?\w+)/g, '(* $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\/\s*(\$?\w+)/g, '(/ $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\+\s*(\$?\w+)/g, '(+ $1 $2)');
+  r = r.replace(/(\$?\w+)\s*-\s*(\$?\w+)/g, '(- $1 $2)');
 
-  return result;
+  return r;
 }
 
-/**
- * 함수 호출을 S-expression으로 변환
- */
-function convertFunctionCalls(expr: string): string {
-  let result = expr;
+function cvtFunc(e: string): string {
+  let r = e;
 
-  // println(...) → (println ...)
-  result = result.replace(/println\s*\(\s*([^)]*)\s*\)/g, (match, args) => {
-    const trimmedArgs = args.trim();
-    return trimmedArgs ? `(println ${trimmedArgs})` : '(println)';
+  r = r.replace(/println\s*\(\s*([^)]*)\s*\)/g, (m, a) => {
+    const ta = a.trim();
+    return ta ? `(println ${ta})` : '(println)';
   });
 
-  // print(...) → (println ...)
-  result = result.replace(/print\s*\(\s*([^)]*)\s*\)/g, (match, args) => {
-    const trimmedArgs = args.trim();
-    return trimmedArgs ? `(println ${trimmedArgs})` : '(println)';
+  r = r.replace(/print\s*\(\s*([^)]*)\s*\)/g, (m, a) => {
+    const ta = a.trim();
+    return ta ? `(println ${ta})` : '(println)';
   });
 
-  return result;
+  return r;
 }
 
-/**
- * 함수를 S-expression [FUNC ...] 블록으로 생성
- */
-function generateFunctionBlock(fn: ExportedFunction): string[] {
-  const lines: string[] = [];
-  const mappedReturnType = mapType(fn.lang, fn.returnType);
+function fnBlk(f: ExportedFunction): string[] {
+  const l: string[] = [];
+  const rt = mapType(f.lang, f.returnType);
 
-  // 주석 (언어 표시)
-  lines.push(`; [${fn.lang.toUpperCase()}] ${fn.name}`);
+  l.push(`[FUNC ${f.name}`);
 
-  // FUNC 블록 시작
-  lines.push(`[FUNC ${fn.name}`);
+  const pn = f.params.map(p => `$${p.name}`).join(' ');
+  l.push(`  :params [${pn}]`);
 
-  // :params 섹션
-  const paramNames = fn.params.map(p => `$${p.name}`).join(' ');
-  lines.push(`  :params [${paramNames}]`);
-
-  // :return 섹션 (void가 아닐 때만)
-  if (fn.returnType !== 'void') {
-    lines.push(`  :return ${mappedReturnType}`);
+  if (f.returnType !== 'void') {
+    l.push(`  :return ${rt}`);
   }
 
-  // :body 섹션 (S-expression으로 변환된 본체)
-  const sExprBody = toSExpression(fn.lang, fn.body);
-  lines.push(`  :body ${sExprBody}`);
+  const sb = toSExpr(f.lang, f.body);
+  l.push(`  :body ${sb}`);
 
-  // FUNC 블록 종료
-  lines.push(']');
+  l.push(']');
 
-  return lines;
+  return l;
 }
 
-/**
- * 통합 코드 생성: 모든 트랜스파일된 함수를 하나의 unified.fl 파일로
- */
-export function generateUnifiedCode(ast: any, transpiledResult: TranspiledResult): string {
-  const lines: string[] = [];
+function stmtToSExpr(s: any): string {
+  if (s.type === 'Assign') {
+    const v = exprToSExpr(s.value);
+    return `(let $${s.name} ${v})`;
+  } else if (s.type === 'Return') {
+    const v = s.value ? exprToSExpr(s.value) : '';
+    return v ? v : '';
+  } else if (s.type === 'Call') {
+    return exprToSExpr(s);
+  }
+  return '';
+}
 
-  // 헤더 (Lisp 스타일 주석)
-  lines.push('; AUTO-GENERATED by FreeLang Nexus 2');
-  lines.push('; Transpiled from Rust/Go/C/Python to FreeLang v9 S-expression');
-  lines.push('');
+function exprToSExpr(e: any): string {
+  if (e.type === 'Call') {
+    const a = e.args?.map((x: any) => exprToSExpr(x)).join(' ') || '';
+    const c = e.callee?.name || 'x';
+    return a ? `(${c} ${a})` : `(${c})`;
+  } else if (e.type === 'Number') {
+    return e.value;
+  } else if (e.type === 'String') {
+    return `"${e.value}"`;
+  } else if (e.type === 'Identifier') {
+    return `$${e.name}`;
+  }
+  return '';
+}
 
-  // 트랜스파일된 함수들
-  for (const fn of transpiledResult.functions) {
-    const funcLines = generateFunctionBlock(fn as ExportedFunction);
-    lines.push(...funcLines);
-    lines.push('');
+function nodeToFlv9(n: any): string {
+  if (!n) return '';
+
+  if (n.sourceCode) {
+    return n.sourceCode;
   }
 
-  // V 오케스트레이터 코드 (있으면)
-  if (transpiledResult.vCode.trim()) {
-    lines.push('; ─ V Orchestrator Code (from original .fl) ─');
-    lines.push(transpiledResult.vCode);
+  if (n.type === 'VFunction') {
+    const pm = n.params?.map((p: any) => `$${p.name}`).join(' ') || '';
+    let bd = '';
+    if (Array.isArray(n.body)) {
+      const ss = n.body.map((st: any) => stmtToSExpr(st)).filter((x: string) => x);
+      bd = ss.length === 1 ? ss[0] : `(do ${ss.join(' ')})`;
+    }
+
+    return `[FUNC ${n.name}\n  :params [${pm}]\n  :body ${bd}\n]`;
   }
 
-  return lines.join('\n');
+  return '';
+}
+
+export function generateUnifiedCode(ast: any, tr: TranspiledResult): string {
+  const l: string[] = [];
+
+  for (const f of tr.functions) {
+    const fl = fnBlk(f as ExportedFunction);
+    l.push(...fl);
+    l.push('');
+  }
+
+  if (tr.vCode.trim()) {
+    const vf = ast?.body?.find?.((n: any) => n.type === 'VFunction');
+    if (vf) {
+      l.push(nodeToFlv9(vf));
+    }
+  }
+
+  return l.join('\n');
 }
 
 export default generateUnifiedCode;

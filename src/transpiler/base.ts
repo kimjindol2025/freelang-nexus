@@ -1,35 +1,25 @@
-/**
- * FreeLang Nexus 2 — 트랜스파일러 공통 모듈
- *
- * 타입 매핑, 함수 시그니처 변환, body 변환 등 공통 기능
- */
+export function mapType(l: string, t: string): string {
+  const ts = t.trim().toLowerCase();
 
-/**
- * 언어별 타입을 FreeLang v9 타입으로 매핑
- */
-export function mapType(lang: string, type: string): string {
-  const typeStr = type.trim().toLowerCase();
-
-  switch (lang.toLowerCase()) {
+  switch (l.toLowerCase()) {
     case 'rust':
-      return mapRustType(typeStr);
+      return mrT(ts);
     case 'go':
-      return mapGoType(typeStr);
+      return mgT(ts);
     case 'c':
     case 'cpp':
-      return mapCType(typeStr);
+      return mcT(ts);
     case 'python':
-      return mapPythonType(typeStr);
+      return mpT(ts);
     default:
-      return 'any';
+      return 'number';
   }
 }
 
-function mapRustType(type: string): string {
-  // Remove references/pointers
-  type = type.replace(/&.*?(?=\s|$)/, '').trim();
+function mrT(t: string): string {
+  t = t.replace(/&.*?(?=\s|$)/, '').trim();
 
-  const mapping: { [key: string]: string } = {
+  const m: { [key: string]: string } = {
     'i32': 'number',
     'i64': 'number',
     'u32': 'number',
@@ -43,11 +33,11 @@ function mapRustType(type: string): string {
     'void': 'void',
   };
 
-  return mapping[type] || 'number';
+  return m[t] || 'number';
 }
 
-function mapGoType(type: string): string {
-  const mapping: { [key: string]: string } = {
+function mgT(t: string): string {
+  const m: { [key: string]: string } = {
     'int': 'number',
     'int32': 'number',
     'int64': 'number',
@@ -63,11 +53,11 @@ function mapGoType(type: string): string {
     'error': 'string',
   };
 
-  return mapping[type] || 'number';
+  return m[t] || 'number';
 }
 
-function mapCType(type: string): string {
-  const mapping: { [key: string]: string } = {
+function mcT(t: string): string {
+  const m: { [key: string]: string } = {
     'int': 'number',
     'int32_t': 'number',
     'int64_t': 'number',
@@ -83,11 +73,11 @@ function mapCType(type: string): string {
     'void': 'void',
   };
 
-  return mapping[type] || 'number';
+  return m[t] || 'number';
 }
 
-function mapPythonType(type: string): string {
-  const mapping: { [key: string]: string } = {
+function mpT(t: string): string {
+  const m: { [key: string]: string } = {
     'int': 'number',
     'float': 'number',
     'str': 'string',
@@ -96,12 +86,9 @@ function mapPythonType(type: string): string {
     'any': 'number',
   };
 
-  return mapping[type] || 'number';
+  return m[t] || 'number';
 }
 
-/**
- * 함수 시그니처를 FreeLang v9 형식으로 변환
- */
 export interface ExportedFunction {
   name: string;
   params: Array<{ name: string; type: string }>;
@@ -110,251 +97,226 @@ export interface ExportedFunction {
   lang: string;
 }
 
-export function generateFlvSignature(fn: ExportedFunction): string {
-  const paramStr = fn.params
-    .map(p => `${p.name}: ${mapType(fn.lang, p.type)}`)
+export function generateFlvSignature(f: ExportedFunction): string {
+  const ps = f.params
+    .map(p => `${p.name}: ${mapType(f.lang, p.type)}`)
     .join(', ');
 
-  const returnType = fn.returnType === 'void' ? '' : ` -> ${mapType(fn.lang, fn.returnType)}`;
+  const rt = f.returnType === 'void' ? '' : ` -> ${mapType(f.lang, f.returnType)}`;
 
-  return `fn ${fn.name}(${paramStr})${returnType}`;
+  return `fn ${f.name}(${ps})${rt}`;
 }
 
-/**
- * 함수 body를 간단히 정규식으로 변환 (MVP: 기본적인 변환만)
- */
-export function transpileBody(lang: string, body: string): string {
-  let result = body;
+export function transpileBody(l: string, b: string): string {
+  let r = b;
 
-  switch (lang.toLowerCase()) {
+  switch (l.toLowerCase()) {
     case 'rust':
-      result = transpileRustBody(result);
+      r = trB(r);
       break;
     case 'go':
-      result = transpileGoBody(result);
+      r = tgB(r);
       break;
     case 'c':
     case 'cpp':
-      result = transpileCBody(result);
+      r = tcB(r);
       break;
     case 'python':
-      result = transpilePythonBody(result);
+      r = tpB(r);
       break;
   }
 
-  return result;
+  return r;
 }
 
-function transpileRustBody(body: string): string {
-  let result = body;
-
-  // return 문은 그대로
-  // as 캐스트 제거
-  result = result.replace(/\s+as\s+\w+/g, '');
-
-  // 세미콜론 유지 (FL v9도 필요)
-  return result;
+function trB(b: string): string {
+  let r = b;
+  r = r.replace(/\s+as\s+\w+/g, '');
+  return r;
 }
 
-function transpileGoBody(body: string): string {
-  let result = body;
-
-  // return 문은 그대로
-  // panic 제거 (에러 처리는 생략)
-  result = result.replace(/panic\([^)]*\)/g, 'null');
-
-  // := → = 로 변환
-  result = result.replace(/:=/g, '=');
-
-  return result;
+function tgB(b: string): string {
+  let r = b;
+  r = r.replace(/panic\([^)]*\)/g, 'null');
+  r = r.replace(/:=/g, '=');
+  return r;
 }
 
-function transpileCBody(body: string): string {
-  let result = body;
+function tcB(b: string): string {
+  let r = b;
 
-  // C 타입 선언을 FL v9 let 선언으로
-  result = result.replace(/int\s+(\w+)\s*=/g, 'let $1 =');
-  result = result.replace(/double\s+(\w+)\s*=/g, 'let $1 =');
-  result = result.replace(/float\s+(\w+)\s*=/g, 'let $1 =');
-  result = result.replace(/bool\s+(\w+)\s*=/g, 'let $1 =');
-  result = result.replace(/char\*\s+(\w+)\s*=/g, 'let $1 =');
+  r = r.replace(/int\s+(\w+)\s*=/g, 'let $1 =');
+  r = r.replace(/double\s+(\w+)\s*=/g, 'let $1 =');
+  r = r.replace(/float\s+(\w+)\s*=/g, 'let $1 =');
+  r = r.replace(/bool\s+(\w+)\s*=/g, 'let $1 =');
+  r = r.replace(/char\*\s+(\w+)\s*=/g, 'let $1 =');
 
-  // for 루프를 while로
-  // for (int i = 0; i < 10; i++) { ... } → while i < 10 { ... i = i + 1 }
-  result = result.replace(
+  r = r.replace(
     /for\s*\(\s*int\s+(\w+)\s*=\s*(\d+);\s*(\w+)\s*<\s*(\w+);\s*\w+\+\+\s*\)\s*{/g,
-    (match, varName, initVal, condVar, condVal) => {
-      return `let ${varName}: i64 = ${initVal}\nwhile ${condVar} < ${condVal} {`;
+    (m, vn, iv, cv, cvl) => {
+      return `let ${vn}: i64 = ${iv}\nwhile ${cv} < ${cvl} {`;
     }
   );
 
-  // i++ → i = i + 1
-  result = result.replace(/(\w+)\+\+/g, '$1 = $1 + 1');
-  result = result.replace(/(\w+)--/g, '$1 = $1 - 1');
+  r = r.replace(/(\w+)\+\+/g, '$1 = $1 + 1');
+  r = r.replace(/(\w+)--/g, '$1 = $1 - 1');
 
-  // printf → println (간단히)
-  result = result.replace(/printf\s*\(\s*"([^"]*)"\s*\)/g, 'println("$1")');
+  r = r.replace(/printf\s*\(\s*"([^"]*)"\s*\)/g, 'println("$1")');
 
-  return result;
+  return r;
 }
 
-function transpilePythonBody(body: string): string {
-  let result = body;
+function tpB(b: string): string {
+  let r = b;
 
-  // print → println
-  result = result.replace(/print\s*\(/g, 'println(');
+  r = r.replace(/print\s*\(/g, 'println(');
 
-  // import 문 제거 (간단히)
-  result = result.replace(/import\s+\w+\n/g, '');
-  result = result.replace(/from\s+\w+\s+import\s+\w+\n/g, '');
+  r = r.replace(/import\s+\w+\n/g, '');
+  r = r.replace(/from\s+\w+\s+import\s+\w+\n/g, '');
 
-  // def 함수 정의 제거
-  result = result.replace(/def\s+\w+\s*\([^)]*\):\n/g, '');
+  r = r.replace(/def\s+\w+\s*\([^)]*\):\n/g, '');
 
-  // 들여쓰기 제거 (Python → FL v9)
-  result = result
+  r = r
     .split('\n')
-    .map(line => line.replace(/^\s+/, ''))
+    .map(ln => ln.replace(/^\s+/, ''))
     .join('\n');
 
-  return result;
+  return r;
 }
 
-/**
- * 트랜스파일 함수 추출 (정규식 기반, MVP)
- */
-export function extractRustFunctions(code: string): ExportedFunction[] {
-  const pattern = /#\[no_mangle\]\s*pub\s+extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*->\s*(\w+)\s*{([^}]+)}/g;
-  const functions: ExportedFunction[] = [];
+export function extractRustFunctions(c: string): ExportedFunction[] {
+  const p = /#\[no_mangle\]\s*pub\s+extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*->\s*(\w+)\s*{([^}]+)}/g;
+  const fs: ExportedFunction[] = [];
 
-  let match;
-  while ((match = pattern.exec(code)) !== null) {
-    const [, name, params, returnType, body] = match;
-    const parsedParams = parseParams(params, 'rust');
+  let m;
+  while ((m = p.exec(c)) !== null) {
+    const [, nm, pm, rt, bd] = m;
+    const pp = ppRust(pm);
 
-    functions.push({
-      name,
-      params: parsedParams,
-      returnType,
-      body: body.trim(),
+    fs.push({
+      name: nm,
+      params: pp,
+      returnType: rt,
+      body: bd.trim(),
       lang: 'rust',
     });
   }
 
-  return functions;
+  return fs;
 }
 
-export function extractGoFunctions(code: string): ExportedFunction[] {
-  const pattern = /\/\/export\s+(\w+)\s*\n\s*func\s+(\w+)\s*\(([^)]*)\)\s*(\w+)\s*{([^}]+)}/g;
-  const functions: ExportedFunction[] = [];
+export function extractGoFunctions(c: string): ExportedFunction[] {
+  const p = /\/\/export\s+(\w+)\s*\n\s*func\s+(\w+)\s*\(([^)]*)\)\s*(\w+)\s*{([^}]+)}/g;
+  const fs: ExportedFunction[] = [];
 
-  let match;
-  while ((match = pattern.exec(code)) !== null) {
-    const [, exportName, funcName, params, returnType, body] = match;
-    const parsedParams = parseParams(params, 'go');
+  let m;
+  while ((m = p.exec(c)) !== null) {
+    const [, en, fn, pm, rt, bd] = m;
+    const pp = ppGo(pm);
 
-    functions.push({
-      name: funcName,
-      params: parsedParams,
-      returnType,
-      body: body.trim(),
+    fs.push({
+      name: fn,
+      params: pp,
+      returnType: rt,
+      body: bd.trim(),
       lang: 'go',
     });
   }
 
-  return functions;
+  return fs;
 }
 
-export function extractCFunctions(code: string): ExportedFunction[] {
-  const pattern = /(\w+)\s+(\w+)\s*\(([^)]*)\)\s*{([^}]+)}/g;
-  const functions: ExportedFunction[] = [];
+export function extractCFunctions(c: string): ExportedFunction[] {
+  const p = /(\w+)\s+(\w+)\s*\(([^)]*)\)\s*{([^}]+)}/g;
+  const fs: ExportedFunction[] = [];
 
-  let match;
-  while ((match = pattern.exec(code)) !== null) {
-    const [, returnType, name, params, body] = match;
-    const parsedParams = parseParams(params, 'c');
+  let m;
+  while ((m = p.exec(c)) !== null) {
+    const [, rt, nm, pm, bd] = m;
+    const pp = ppC(pm);
 
-    functions.push({
-      name,
-      params: parsedParams,
-      returnType,
-      body: body.trim(),
+    fs.push({
+      name: nm,
+      params: pp,
+      returnType: rt,
+      body: bd.trim(),
       lang: 'c',
     });
   }
 
-  return functions;
+  return fs;
 }
 
-export function extractPythonFunctions(code: string): ExportedFunction[] {
-  const pattern = /def\s+(\w+)\s*\(([^)]*)\):\n((?:\s+[^\n]+\n?)*)/g;
-  const functions: ExportedFunction[] = [];
+export function extractPythonFunctions(c: string): ExportedFunction[] {
+  const p = /def\s+(\w+)\s*\(([^)]*)\):\n((?:\s+[^\n]+\n?)*)/g;
+  const fs: ExportedFunction[] = [];
 
-  let match;
-  while ((match = pattern.exec(code)) !== null) {
-    const [, name, params, body] = match;
-    const parsedParams = parseParamsPython(params);
+  let m;
+  while ((m = p.exec(c)) !== null) {
+    const [, nm, pm, bd] = m;
+    const pp = ppPy(pm);
 
-    functions.push({
-      name,
-      params: parsedParams,
+    fs.push({
+      name: nm,
+      params: pp,
       returnType: 'any',
-      body: body.trim(),
+      body: bd.trim(),
       lang: 'python',
     });
   }
 
-  return functions;
+  return fs;
 }
 
-function parseParams(paramStr: string, lang: string): Array<{ name: string; type: string }> {
-  if (!paramStr.trim()) return [];
+function ppRust(ps: string): Array<{ name: string; type: string }> {
+  if (!ps.trim()) return [];
 
-  if (lang === 'rust') {
-    // x: i32, y: i64
-    return paramStr.split(',').map(p => {
-      const [name, type] = p.trim().split(':').map(s => s.trim());
-      return { name, type };
-    });
-  } else if (lang === 'go') {
-    // n int, s string
-    const parts = paramStr.split(',').map(p => p.trim());
-    const result: Array<{ name: string; type: string }> = [];
+  return ps.split(',').map(p => {
+    const [nm, t] = p.trim().split(':').map(s => s.trim());
+    return { name: nm, type: t };
+  });
+}
 
-    for (const part of parts) {
-      const tokens = part.split(/\s+/);
-      if (tokens.length >= 2) {
-        result.push({
-          name: tokens[0],
-          type: tokens.slice(1).join(' '),
-        });
-      }
+function ppGo(ps: string): Array<{ name: string; type: string }> {
+  if (!ps.trim()) return [];
+
+  const pts = ps.split(',').map(p => p.trim());
+  const r: Array<{ name: string; type: string }> = [];
+
+  for (const p of pts) {
+    const ts = p.split(/\s+/);
+    if (ts.length >= 2) {
+      r.push({
+        name: ts[0],
+        type: ts.slice(1).join(' '),
+      });
     }
-    return result;
-  } else if (lang === 'c') {
-    // int x, double y
-    const parts = paramStr.split(',').map(p => p.trim());
-    const result: Array<{ name: string; type: string }> = [];
-
-    for (const part of parts) {
-      const tokens = part.split(/\s+/);
-      if (tokens.length >= 2) {
-        result.push({
-          name: tokens[tokens.length - 1],
-          type: tokens.slice(0, -1).join(' '),
-        });
-      }
-    }
-    return result;
   }
-
-  return [];
+  return r;
 }
 
-function parseParamsPython(paramStr: string): Array<{ name: string; type: string }> {
-  if (!paramStr.trim()) return [];
+function ppC(ps: string): Array<{ name: string; type: string }> {
+  if (!ps.trim()) return [];
 
-  return paramStr.split(',').map(p => ({
+  const pts = ps.split(',').map(p => p.trim());
+  const r: Array<{ name: string; type: string }> = [];
+
+  for (const p of pts) {
+    const ts = p.split(/\s+/);
+    if (ts.length >= 2) {
+      r.push({
+        name: ts[ts.length - 1],
+        type: ts.slice(0, -1).join(' '),
+      });
+    }
+  }
+  return r;
+}
+
+function ppPy(ps: string): Array<{ name: string; type: string }> {
+  if (!ps.trim()) return [];
+
+  return ps.split(',').map(p => ({
     name: p.trim(),
     type: 'any',
   }));
