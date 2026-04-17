@@ -1,0 +1,13 @@
+@mode(rust)
+@lang("rust")
+---
+#[no_mangle]
+pub extern "C" fn add(x: i32, y: i32) -> i32 {
+  x + y
+}
+---
+
+@mode(v)
+; 호출 예제
+(let $result (add 5 7))
+(println $result)

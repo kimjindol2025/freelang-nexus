@@ -1,0 +1,33 @@
+@mode(v)
+
+@lang("rust")
+---
+#[no_mangle]
+pub extern "C" fn add(x: i32, y: i32) -> i32 {
+  x + y
+}
+---
+
+@lang("go")
+---
+//export multiply
+func multiply(a int, b int) int {
+  return a * b
+}
+---
+
+@lang("python")
+---
+def greet(name):
+    print("Hello: " + name)
+---
+
+@mode(v)
+
+fn test() -> i64 {
+  let sum = add(10, 20)
+  let product = multiply(5, 3)
+  println(sum)
+  println(product)
+  return 0
+}

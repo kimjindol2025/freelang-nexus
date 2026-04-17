@@ -13,32 +13,32 @@ import {
 
 describe('Type Mapping', () => {
   test('Rust type mapping', () => {
-    expect(mapType('rust', 'i32')).toBe('i64');
-    expect(mapType('rust', 'i64')).toBe('i64');
-    expect(mapType('rust', 'f64')).toBe('f64');
+    expect(mapType('rust', 'i32')).toBe('number');
+    expect(mapType('rust', 'i64')).toBe('number');
+    expect(mapType('rust', 'f64')).toBe('number');
     expect(mapType('rust', 'bool')).toBe('bool');
-    expect(mapType('rust', 'str')).toBe('str');
+    expect(mapType('rust', 'str')).toBe('string');
   });
 
   test('Go type mapping', () => {
-    expect(mapType('go', 'int')).toBe('i64');
-    expect(mapType('go', 'int64')).toBe('i64');
-    expect(mapType('go', 'float64')).toBe('f64');
+    expect(mapType('go', 'int')).toBe('number');
+    expect(mapType('go', 'int64')).toBe('number');
+    expect(mapType('go', 'float64')).toBe('number');
     expect(mapType('go', 'bool')).toBe('bool');
-    expect(mapType('go', 'string')).toBe('str');
+    expect(mapType('go', 'string')).toBe('string');
   });
 
   test('C type mapping', () => {
-    expect(mapType('c', 'int')).toBe('i64');
-    expect(mapType('c', 'double')).toBe('f64');
-    expect(mapType('c', 'char*')).toBe('str');
+    expect(mapType('c', 'int')).toBe('number');
+    expect(mapType('c', 'double')).toBe('number');
+    expect(mapType('c', 'char*')).toBe('string');
     expect(mapType('c', 'void')).toBe('void');
   });
 
   test('Python type mapping', () => {
-    expect(mapType('python', 'int')).toBe('i64');
-    expect(mapType('python', 'float')).toBe('f64');
-    expect(mapType('python', 'str')).toBe('str');
+    expect(mapType('python', 'int')).toBe('number');
+    expect(mapType('python', 'float')).toBe('number');
+    expect(mapType('python', 'str')).toBe('string');
   });
 });
 
@@ -104,9 +104,9 @@ describe('Function Signature Generation', () => {
 
     const sig = generateFlvSignature(fn);
     expect(sig).toContain('fn add');
-    expect(sig).toContain('a: i64');
-    expect(sig).toContain('b: i64');
-    expect(sig).toContain('-> i64');
+    expect(sig).toContain('a: number');
+    expect(sig).toContain('b: number');
+    expect(sig).toContain('-> number');
   });
 
   test('Generate FL v9 signature from Go', () => {
@@ -120,6 +120,6 @@ describe('Function Signature Generation', () => {
 
     const sig = generateFlvSignature(fn);
     expect(sig).toContain('fn hash');
-    expect(sig).toContain('n: i64');
+    expect(sig).toContain('n: number');
   });
 });

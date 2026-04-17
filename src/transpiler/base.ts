@@ -30,73 +30,73 @@ function mapRustType(type: string): string {
   type = type.replace(/&.*?(?=\s|$)/, '').trim();
 
   const mapping: { [key: string]: string } = {
-    'i32': 'i64',
-    'i64': 'i64',
-    'u32': 'i64',
-    'u64': 'i64',
-    'f32': 'f64',
-    'f64': 'f64',
+    'i32': 'number',
+    'i64': 'number',
+    'u32': 'number',
+    'u64': 'number',
+    'f32': 'number',
+    'f64': 'number',
     'bool': 'bool',
-    'string': 'str',
-    'str': 'str',
+    'string': 'string',
+    'str': 'string',
     '()': 'void',
     'void': 'void',
   };
 
-  return mapping[type] || 'any';
+  return mapping[type] || 'number';
 }
 
 function mapGoType(type: string): string {
   const mapping: { [key: string]: string } = {
-    'int': 'i64',
-    'int32': 'i64',
-    'int64': 'i64',
-    'uint': 'i64',
-    'uint32': 'i64',
-    'uint64': 'i64',
-    'float32': 'f64',
-    'float64': 'f64',
+    'int': 'number',
+    'int32': 'number',
+    'int64': 'number',
+    'uint': 'number',
+    'uint32': 'number',
+    'uint64': 'number',
+    'float32': 'number',
+    'float64': 'number',
     'bool': 'bool',
-    'string': 'str',
-    'rune': 'i64',
-    'byte': 'i64',
-    'error': 'str', // 간단히 str로 매핑
+    'string': 'string',
+    'rune': 'number',
+    'byte': 'number',
+    'error': 'string',
   };
 
-  return mapping[type] || 'any';
+  return mapping[type] || 'number';
 }
 
 function mapCType(type: string): string {
   const mapping: { [key: string]: string } = {
-    'int': 'i64',
-    'int32_t': 'i64',
-    'int64_t': 'i64',
-    'uint': 'i64',
-    'uint32_t': 'i64',
-    'uint64_t': 'i64',
-    'float': 'f64',
-    'double': 'f64',
+    'int': 'number',
+    'int32_t': 'number',
+    'int64_t': 'number',
+    'uint': 'number',
+    'uint32_t': 'number',
+    'uint64_t': 'number',
+    'float': 'number',
+    'double': 'number',
     'bool': 'bool',
     '_bool': 'bool',
-    'char': 'i64',
-    'char*': 'str',
+    'char': 'number',
+    'char*': 'string',
     'void': 'void',
   };
 
-  return mapping[type] || 'any';
+  return mapping[type] || 'number';
 }
 
 function mapPythonType(type: string): string {
   const mapping: { [key: string]: string } = {
-    'int': 'i64',
-    'float': 'f64',
-    'str': 'str',
+    'int': 'number',
+    'float': 'number',
+    'str': 'string',
     'bool': 'bool',
     'none': 'void',
-    'any': 'any',
+    'any': 'number',
   };
 
-  return mapping[type] || 'any';
+  return mapping[type] || 'number';
 }
 
 /**

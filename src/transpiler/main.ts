@@ -48,7 +48,7 @@ export function transpilePolyglot(ast: any): TranspiledResult {
 
       functions.push(...extracted);
       console.error(`[Nexus 2] Found ${extracted.length} exportable ${lang} function(s)`);
-    } else if (node.type === 'FunctionDef' || node.type === 'PyFunction') {
+    } else if (node.type === 'FunctionDef' || node.type === 'PyFunction' || node.type === 'VFunction') {
       // V 모드의 함수는 그대로 유지
       vCode += nodeToFlv9(node) + '\n';
     } else if (node.type === 'VBlock') {
@@ -73,8 +73,59 @@ export function transpilePolyglot(ast: any): TranspiledResult {
  * 간단한 AST 노드 → FL v9 변환 (V 코드)
  */
 function nodeToFlv9(node: any): string {
-  // 간단히: 노드의 sourceCode를 그대로 반환
-  return node.sourceCode || '';
+  if (node.sourceCode) {
+    return node.sourceCode;
+  }
+
+  // VFunction 노드를 텍스트로 재구성
+  if (node.type === 'VFunction') {
+    const params = node.params?.map((p: any) => `${p.name}: ${p.type}`).join(', ') || '';
+    const returnType = node.returnType && node.returnType !== 'void' ? ` -> ${node.returnType}` : '';
+
+    // body 배열을 V 코드로 변환 (간단히)
+    let bodyCode = '';
+    if (Array.isArray(node.body)) {
+      bodyCode = node.body.map((stmt: any) => statementToFlv9(stmt)).join('\n  ');
+    }
+
+    return `fn ${node.name}(${params})${returnType} {\n  ${bodyCode}\n}`;
+  }
+
+  return '';
+}
+
+/**
+ * Statement를 V 코드로 변환
+ */
+function statementToFlv9(stmt: any): string {
+  if (stmt.type === 'Assign') {
+    const value = expressionToFlv9(stmt.value);
+    return `let ${stmt.name} = ${value}`;
+  } else if (stmt.type === 'Return') {
+    const value = stmt.value ? expressionToFlv9(stmt.value) : '';
+    return value ? `return ${value}` : 'return';
+  } else if (stmt.type === 'Call') {
+    return expressionToFlv9(stmt);
+  }
+  return '';
+}
+
+/**
+ * Expression을 V 코드로 변환
+ */
+function expressionToFlv9(expr: any): string {
+  if (expr.type === 'Call') {
+    const args = expr.args?.map((a: any) => expressionToFlv9(a)).join(', ') || '';
+    const callee = expr.callee?.name || 'unknown';
+    return `${callee}(${args})`;
+  } else if (expr.type === 'Number') {
+    return expr.value;
+  } else if (expr.type === 'String') {
+    return `"${expr.value}"`;
+  } else if (expr.type === 'Identifier') {
+    return expr.name;
+  }
+  return '';
 }
 
 export default transpilePolyglot;
