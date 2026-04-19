@@ -123,3 +123,55 @@ describe('Function Signature Generation', () => {
     expect(sig).toContain('n: number');
   });
 });
+
+describe('Phase 1: Nested Brace Extraction', () => {
+  test('Rust multi-statement body with nested braces', () => {
+    const code = `
+#[no_mangle]
+pub extern "C" fn sum_range(from: i32, to: i32) -> i32 {
+  let mut total = 0;
+  let mut i = from;
+  while i <= to {
+    total = total + i;
+    i = i + 1;
+  }
+  return total;
+}`;
+    const funcs = extractRustFunctions(code);
+    expect(funcs.length).toBe(1);
+    expect(funcs[0].name).toBe('sum_range');
+    // body 가 while 블록 전체를 포함하는지 확인
+    expect(funcs[0].body).toContain('while i <= to');
+    expect(funcs[0].body).toContain('total = total + i');
+  });
+
+  test('Go multi-statement body with nested if', () => {
+    const code = `
+//export fibonacci
+func fibonacci(n int) int {
+  if n <= 1 {
+    return n
+  }
+  return fibonacci(n - 1) + fibonacci(n - 2)
+}`;
+    const funcs = extractGoFunctions(code);
+    expect(funcs.length).toBe(1);
+    expect(funcs[0].name).toBe('fibonacci');
+    expect(funcs[0].body).toContain('if n <= 1');
+  });
+
+  test('C function with nested for loop', () => {
+    const code = `
+int power(int x, int n) {
+  int result = 1;
+  for (int i = 0; i < n; i++) {
+    result = result * x;
+  }
+  return result;
+}`;
+    const funcs = extractCFunctions(code);
+    expect(funcs.length).toBe(1);
+    expect(funcs[0].name).toBe('power');
+    expect(funcs[0].body).toContain('for (int i = 0');
+  });
+});

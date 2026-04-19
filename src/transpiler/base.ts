@@ -1,3 +1,33 @@
+/**
+ * 균형잡힌 { ... } 블록을 추출한다.
+ * 정규식 {([^}]+)} 의 중첩 실패를 해결하는 핵심 유틸리티.
+ * @param src  소스 전체
+ * @param openBrace  { 의 시작 인덱스 (이미 { 를 가리켜야 함)
+ * @returns  { 와 대응하는 } 사이의 내용 (중괄호 제외), 또는 null
+ */
+function extractBalancedBraces(src: string, openBrace: number): { content: string; end: number } | null {
+  let depth = 0;
+  let i = openBrace;
+  let inStr = false;
+  let strChar = '';
+
+  for (; i < src.length; i++) {
+    const ch = src[i];
+    if (inStr) {
+      if (ch === '\\') { i++; continue; }
+      if (ch === strChar) inStr = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strChar = ch; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return { content: src.slice(openBrace + 1, i), end: i };
+    }
+  }
+  return null;
+}
+
 export function mapType(l: string, t: string): string {
   const ts = t.trim().toLowerCase();
 
@@ -185,19 +215,26 @@ function tpB(b: string): string {
 }
 
 export function extractRustFunctions(c: string): ExportedFunction[] {
-  const p = /#\[no_mangle\]\s*pub\s+extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*->\s*(\w+)\s*{([^}]+)}/g;
+  // 시그니처만 정규식으로 잡고, body는 extractBalancedBraces() 로 추출
+  const sigPat = /#\[no_mangle\]\s*pub\s+extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([\w<>, *[\]]+))?\s*\{/g;
   const fs: ExportedFunction[] = [];
 
   let m;
-  while ((m = p.exec(c)) !== null) {
-    const [, nm, pm, rt, bd] = m;
+  while ((m = sigPat.exec(c)) !== null) {
+    const [fullMatch, nm, pm, rt = '()'] = m;
+    const braceStart = m.index + fullMatch.length - 1; // { 의 위치
+    const extracted = extractBalancedBraces(c, braceStart);
+    if (!extracted) continue;
+
+    // sigPat.lastIndex 를 extracted.end+1 로 앞당겨 다음 함수부터 재탐색
+    sigPat.lastIndex = extracted.end + 1;
     const pp = ppRust(pm);
 
     fs.push({
       name: nm,
       params: pp,
-      returnType: rt,
-      body: bd.trim(),
+      returnType: (rt || '()').trim(),
+      body: extracted.content.trim(),
       lang: 'rust',
     });
   }
@@ -206,19 +243,26 @@ export function extractRustFunctions(c: string): ExportedFunction[] {
 }
 
 export function extractGoFunctions(c: string): ExportedFunction[] {
-  const p = /\/\/export\s+(\w+)\s*\n\s*func\s+(\w+)\s*\(([^)]*)\)\s*(\w+)\s*{([^}]+)}/g;
+  // 시그니처만 정규식으로 잡고, body는 extractBalancedBraces() 로 추출
+  const sigPat = /\/\/export\s+(\w+)\s*\n\s*func\s+(\w+)\s*\(([^)]*)\)\s*(\w+)\s*\{/g;
   const fs: ExportedFunction[] = [];
 
   let m;
-  while ((m = p.exec(c)) !== null) {
-    const [, en, fn, pm, rt, bd] = m;
+  while ((m = sigPat.exec(c)) !== null) {
+    const [fullMatch, en, fn, pm, rt] = m;
+    const braceStart = m.index + fullMatch.length - 1; // { 의 위치
+    const extracted = extractBalancedBraces(c, braceStart);
+    if (!extracted) continue;
+
+    // sigPat.lastIndex 를 extracted.end+1 로 앞당겨 다음 함수부터 재탐색
+    sigPat.lastIndex = extracted.end + 1;
     const pp = ppGo(pm);
 
     fs.push({
       name: fn,
       params: pp,
-      returnType: rt,
-      body: bd.trim(),
+      returnType: rt.trim(),
+      body: extracted.content.trim(),
       lang: 'go',
     });
   }
@@ -227,19 +271,26 @@ export function extractGoFunctions(c: string): ExportedFunction[] {
 }
 
 export function extractCFunctions(c: string): ExportedFunction[] {
-  const p = /(\w+)\s+(\w+)\s*\(([^)]*)\)\s*{([^}]+)}/g;
+  // 시그니처만 정규식으로 잡고, body는 extractBalancedBraces() 로 추출
+  const sigPat = /(\w+)\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
   const fs: ExportedFunction[] = [];
 
   let m;
-  while ((m = p.exec(c)) !== null) {
-    const [, rt, nm, pm, bd] = m;
+  while ((m = sigPat.exec(c)) !== null) {
+    const [fullMatch, rt, nm, pm] = m;
+    const braceStart = m.index + fullMatch.length - 1; // { 의 위치
+    const extracted = extractBalancedBraces(c, braceStart);
+    if (!extracted) continue;
+
+    // sigPat.lastIndex 를 extracted.end+1 로 앞당겨 다음 함수부터 재탐색
+    sigPat.lastIndex = extracted.end + 1;
     const pp = ppC(pm);
 
     fs.push({
       name: nm,
       params: pp,
-      returnType: rt,
-      body: bd.trim(),
+      returnType: rt.trim(),
+      body: extracted.content.trim(),
       lang: 'c',
     });
   }
