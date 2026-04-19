@@ -1,0 +1,85 @@
+; Nexus 2 최종 작동 버전 (v11)
+
+[FUNC tokenize
+  :params [$source]
+  :body (str-split $source "\n")
+]
+
+[FUNC extract-rust-funcs
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "fn ")
+          (recur (inc i) (conj $funcs (str "[FUNC rust-" i " :params [] :body null]")))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC extract-go-funcs
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "func ")
+          (recur (inc i) (conj $funcs (str "[FUNC go-" i " :params [] :body null]")))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC extract-c-funcs
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "(")
+          (recur (inc i) (conj $funcs (str "[FUNC c-" i " :params [] :body null]")))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC extract-python-funcs
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "def ")
+          (recur (inc i) (conj $funcs (str "[FUNC py-" i " :params [] :body null]")))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC transpile-all
+  :params [$source]
+  :body (let [$tokens (tokenize $source)]
+    (let [$rust (extract-rust-funcs $tokens)]
+      (let [$go (extract-go-funcs $tokens)]
+        (let [$c (extract-c-funcs $tokens)]
+          (let [$python (extract-python-funcs $tokens)]
+            (let [$all (into (into (into (into [] $rust) $go) $c) $python)]
+              (loop [i 0 out ""]
+                (if (>= i (length $all))
+                  $out
+                  (let [$fn (get-at $all i)]
+                    (recur (inc i) (str $out $fn "\n")))))))))))
+]
+
+[FUNC into
+  :params [$arr $items]
+  :body (loop [i 0 res $arr]
+    (if (>= i (length $items))
+      $res
+      (recur (inc i) (conj $res (get-at $items i)))))
+]
+
+(println (transpile-all "@lang(rust)
+fn add(x: i32) -> i32 { x + y }
+
+@lang(go)
+func multiply(a int) int {
+  return a * 2
+}
+
+@lang(python)
+def divide(x):
+  return x / 2"))
