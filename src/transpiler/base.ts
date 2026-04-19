@@ -190,6 +190,13 @@ export function transpileBody(l: string, b: string): string {
 function trB(b: string): string {
   let r = b;
   r = r.replace(/\s+as\s+\w+/g, '');
+  // Result::Ok(v) → v, Result::Err(e) → (error e)
+  r = r.replace(/Ok\s*\(([^)]*)\)/g, (_, v) => v.trim());
+  r = r.replace(/Err\s*\(([^)]*)\)/g, (_, e) => `(error ${e.trim()})`);
+  // unwrap() → 제거
+  r = r.replace(/\.unwrap\(\)/g, '');
+  // ? 연산자 (결과 전파)
+  r = r.replace(/(\w+)\?/g, (_, v) => `(try ${v})`);
   return r;
 }
 
@@ -197,6 +204,8 @@ function tgB(b: string): string {
   let r = b;
   r = r.replace(/panic\([^)]*\)/g, 'null');
   r = r.replace(/:=/g, '=');
+  // if err != nil { return ..., err } 패턴 → (if-err ...)
+  r = r.replace(/if\s+err\s*!=\s*nil\s*\{[^}]*\}/g, '(check-err err)');
   return r;
 }
 
@@ -233,6 +242,10 @@ function tpB(b: string): string {
   r = r.replace(/from\s+\w+\s+import\s+\w+\n/g, '');
 
   r = r.replace(/def\s+\w+\s*\([^)]*\):\n/g, '');
+
+  // try/except 기본 패턴 변환
+  r = r.replace(/try:\n([\s\S]*?)except\s+(\w+)\s+as\s+(\w+):/g,
+    (_, tryBody, excType, excVar) => `(try ${tryBody.trim()} (catch ${excType} $${excVar}))`);
 
   r = r
     .split('\n')

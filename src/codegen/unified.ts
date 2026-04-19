@@ -94,6 +94,7 @@ function cvtBinOp(e: string): string {
 function cvtFunc(e: string): string {
   let r = e;
 
+  // println / print
   r = r.replace(/println\s*\(\s*([^)]*)\s*\)/g, (m, a) => {
     const ta = a.trim();
     return ta ? `(println ${ta})` : '(println)';
@@ -103,6 +104,33 @@ function cvtFunc(e: string): string {
     const ta = a.trim();
     return ta ? `(println ${ta})` : '(println)';
   });
+
+  // C printf with format string: printf("%d\n", x) → (println $x)
+  r = r.replace(/printf\s*\(\s*"([^"]*)"\s*(?:,\s*([^)]*))?\)/g, (_, fmt, args) => {
+    const vars = args ? args.split(',').map((s: string) => s.trim()).join(' ') : '';
+    return vars ? `(println ${vars})` : `(println "${fmt}")`;
+  });
+
+  // Go fmt.Println / fmt.Printf
+  r = r.replace(/fmt\.Println\s*\(([^)]*)\)/g, (_, a) => `(println ${a.trim()})`);
+  r = r.replace(/fmt\.Printf\s*\(\s*"[^"]*"\s*,\s*([^)]*)\)/g, (_, a) => `(println ${a.trim()})`);
+  r = r.replace(/fmt\.Sprintf\s*\(\s*"[^"]*"\s*,\s*([^)]*)\)/g, (_, a) => `(str ${a.trim()})`);
+
+  // Python len() → (len ...)
+  r = r.replace(/\blen\s*\(([^)]*)\)/g, (_, a) => `(len ${a.trim()})`);
+
+  // Python range() → (range ...)
+  r = r.replace(/\brange\s*\(([^)]*)\)/g, (_, a) => `(range ${a.trim()})`);
+
+  // append / push
+  r = r.replace(/(\$\w+)\.push\s*\(([^)]*)\)/g, (_, v, a) => `(append ${v} ${a.trim()})`);
+  r = r.replace(/\bappend\s*\(([^,)]+),\s*([^)]*)\)/g, (_, arr, val) => `(append ${arr.trim()} ${val.trim()})`);
+
+  // String methods
+  r = r.replace(/(\$\w+)\.len\(\)/g, (_, v) => `(len ${v})`);
+  r = r.replace(/(\$\w+)\.to_string\(\)/g, (_, v) => `(str ${v})`);
+  r = r.replace(/(\$\w+)\.to_lowercase\(\)/g, (_, v) => `(lower ${v})`);
+  r = r.replace(/(\$\w+)\.to_uppercase\(\)/g, (_, v) => `(upper ${v})`);
 
   return r;
 }

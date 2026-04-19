@@ -267,3 +267,40 @@ describe('Phase 3: Type System', () => {
     expect(mapType('python', 'Optional[int]')).toBe('option');
   });
 });
+
+describe('Phase 4: Stdlib + Error Handling', () => {
+  test('C printf syntax recognized', () => {
+    const code = `
+int print_val(int x) {
+  printf("%d\\n", x);
+}`;
+    const funcs = extractCFunctions(code);
+    expect(funcs.length).toBe(1);
+    expect(funcs[0].name).toBe('print_val');
+  });
+
+  test('Go panic converted to null', () => {
+    const { transpileBody } = require('../src/transpiler/base');
+    const result = transpileBody('go', 'panic("error")');
+    expect(result).toContain('null');
+  });
+
+  test('Rust Err() converted', () => {
+    const { transpileBody } = require('../src/transpiler/base');
+    const result = transpileBody('rust', 'Err(0)');
+    expect(result).toContain('(error 0)');
+  });
+
+  test('Rust Ok() unwrapped', () => {
+    const { transpileBody } = require('../src/transpiler/base');
+    const result = transpileBody('rust', 'Ok(a / b)');
+    expect(result).not.toContain('Ok(');
+    expect(result).toContain('a / b');
+  });
+
+  test('Rust unwrap() removed', () => {
+    const { transpileBody } = require('../src/transpiler/base');
+    const result = transpileBody('rust', 'value.unwrap()');
+    expect(result).not.toContain('unwrap');
+  });
+});
