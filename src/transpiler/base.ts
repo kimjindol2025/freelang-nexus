@@ -48,6 +48,8 @@ export function mapType(l: string, t: string): string {
 
 function mrT(t: string): string {
   t = t.replace(/&.*?(?=\s|$)/, '').trim();
+  // 제네릭 제거: Vec<T>, Option<T> 등 → 기본 컨테이너 이름만
+  t = t.replace(/<[^>]*>/, '');
 
   const m: { [key: string]: string } = {
     'i32': 'number',
@@ -62,6 +64,13 @@ function mrT(t: string): string {
     '()': 'void',
     'void': 'void',
   };
+
+  // 제네릭: Vec<T>, Option<T>, Result<T,E>, HashMap<K,V>
+  if (/^vec/.test(t)) return 'list';
+  if (/^option/.test(t)) return 'option';
+  if (/^result/.test(t)) return 'result';
+  if (/^hashmap/.test(t)) return 'map';
+  if (/^slice/.test(t) || /^\[/.test(t)) return 'list';
 
   return m[t] || 'number';
 }
@@ -83,6 +92,11 @@ function mgT(t: string): string {
     'error': 'string',
   };
 
+  // Go 슬라이스: []int, []string
+  if (/^\[\]/.test(t)) return 'list';
+  // Go map: map[K]V
+  if (/^map\[/.test(t)) return 'map';
+
   return m[t] || 'number';
 }
 
@@ -103,6 +117,14 @@ function mcT(t: string): string {
     'void': 'void',
   };
 
+  // 포인터: int*, void*, char** 등
+  if (t.endsWith('*')) {
+    const base = t.slice(0, -1).trim();
+    if (base === 'char') return 'string';  // char* → string
+    if (base === 'void') return 'ptr';      // void* → ptr
+    return 'ptr';  // 일반 포인터
+  }
+
   return m[t] || 'number';
 }
 
@@ -115,6 +137,12 @@ function mpT(t: string): string {
     'none': 'void',
     'any': 'number',
   };
+
+  if (/^list\[/.test(t) || t === 'list') return 'list';
+  if (/^dict\[/.test(t) || t === 'dict') return 'map';
+  if (/^optional\[/.test(t)) return 'option';
+  if (/^tuple\[/.test(t)) return 'list';
+  if (t === 'bytes') return 'string';
 
   return m[t] || 'number';
 }
@@ -367,8 +395,19 @@ function ppC(ps: string): Array<{ name: string; type: string }> {
 function ppPy(ps: string): Array<{ name: string; type: string }> {
   if (!ps.trim()) return [];
 
-  return ps.split(',').map(p => ({
-    name: p.trim(),
-    type: 'any',
-  }));
+  return ps.split(',').map(p => {
+    const colonIdx = p.indexOf(':');
+    if (colonIdx !== -1) {
+      // x: int 형식 타입 힌트
+      const name = p.slice(0, colonIdx).trim();
+      const rawType = p.slice(colonIdx + 1).trim();
+      return { name, type: rawType || 'any' };
+    }
+    // name=default 기본값 파라미터
+    const eqIdx = p.indexOf('=');
+    if (eqIdx !== -1) {
+      return { name: p.slice(0, eqIdx).trim(), type: 'any' };
+    }
+    return { name: p.trim(), type: 'any' };
+  });
 }

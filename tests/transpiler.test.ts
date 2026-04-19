@@ -225,3 +225,45 @@ describe('Phase 2: Operators and Control Flow', () => {
     expect(c).toContain('(mod');
   });
 });
+
+describe('Phase 3: Type System', () => {
+  test('Rust Vec<T> maps to list', () => {
+    expect(mapType('rust', 'Vec<i32>')).toBe('list');
+  });
+
+  test('Rust Option<T> maps to option', () => {
+    expect(mapType('rust', 'Option<String>')).toBe('option');
+  });
+
+  test('Rust Result<T,E> maps to result', () => {
+    expect(mapType('rust', 'Result<i32, Error>')).toBe('result');
+  });
+
+  test('C pointer int* maps to ptr', () => {
+    expect(mapType('c', 'int*')).toBe('ptr');
+  });
+
+  test('C pointer char* maps to string', () => {
+    expect(mapType('c', 'char*')).toBe('string');
+  });
+
+  test('Go slice []int maps to list', () => {
+    expect(mapType('go', '[]int')).toBe('list');
+  });
+
+  test('Go map[K]V maps to map', () => {
+    expect(mapType('go', 'map[string]int')).toBe('map');
+  });
+
+  test('Python list maps to list', () => {
+    expect(mapType('python', 'list')).toBe('list');
+  });
+
+  test('Python dict maps to map', () => {
+    expect(mapType('python', 'dict')).toBe('map');
+  });
+
+  test('Python Optional maps to option', () => {
+    expect(mapType('python', 'Optional[int]')).toBe('option');
+  });
+});
