@@ -175,3 +175,53 @@ int power(int x, int n) {
     expect(funcs[0].body).toContain('for (int i = 0');
   });
 });
+
+describe('Phase 2: Operators and Control Flow', () => {
+  test('&& operator converts to (and)', () => {
+    const { generateUnifiedCode } = require('../src/codegen/unified');
+    const tr = {
+      functions: [{
+        name: 'test_logic',
+        params: [{ name: 'a', type: 'bool' }, { name: 'b', type: 'bool' }],
+        returnType: 'bool',
+        body: 'a && b',
+        lang: 'rust',
+      }],
+      vCode: '',
+    };
+    const c = generateUnifiedCode({}, tr);
+    expect(c).toContain('(and');
+  });
+
+  test('|| operator converts to (or)', () => {
+    const { generateUnifiedCode } = require('../src/codegen/unified');
+    const tr = {
+      functions: [{
+        name: 'test_or',
+        params: [{ name: 'a', type: 'bool' }, { name: 'b', type: 'bool' }],
+        returnType: 'bool',
+        body: 'a || b',
+        lang: 'rust',
+      }],
+      vCode: '',
+    };
+    const c = generateUnifiedCode({}, tr);
+    expect(c).toContain('(or');
+  });
+
+  test('% (modulo) operator converts to (mod)', () => {
+    const { generateUnifiedCode } = require('../src/codegen/unified');
+    const tr = {
+      functions: [{
+        name: 'is_even',
+        params: [{ name: 'n', type: 'i32' }],
+        returnType: 'bool',
+        body: 'n % 2 == 0',
+        lang: 'rust',
+      }],
+      vCode: '',
+    };
+    const c = generateUnifiedCode({}, tr);
+    expect(c).toContain('(mod');
+  });
+});

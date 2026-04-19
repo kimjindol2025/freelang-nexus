@@ -43,8 +43,9 @@ function addDol(e: string): string {
     }
   }
 
+  const KEYWORDS = /^\d|^return$|^if$|^else$|^while$|^for$|^in$|^let$|^mut$|^fn$|^match$|^case$|^loop$|^break$|^continue$|^println$|^print$|^true$|^false$|^null$|^None$|^and$|^or$|^not$|^do$|^lambda$/;
   r = r.replace(/\b([a-zA-Z_]\w*)\b/g, (m) => {
-    if (/^\d|^return$|^if$|^while$|^let$|^fn$|^println$|^print$|^true$|^false$/.test(m)) {
+    if (KEYWORDS.test(m)) {
       return m;
     }
     if (m.startsWith('$')) {
@@ -59,6 +60,7 @@ function addDol(e: string): string {
 function cvtBinOp(e: string): string {
   let r = e;
 
+  // 비교 연산자 (우선순위 높음 — 먼저 처리)
   r = r.replace(/(\$\w+)\s*>=\s*(\$?\w+)/g, '(>= $1 $2)');
   r = r.replace(/(\$\w+)\s*<=\s*(\$?\w+)/g, '(<= $1 $2)');
   r = r.replace(/(\$\w+)\s*==\s*(\$?\w+)/g, '(= $1 $2)');
@@ -66,10 +68,25 @@ function cvtBinOp(e: string): string {
   r = r.replace(/(\$\w+)\s*>\s*(\$?\w+)/g, '(> $1 $2)');
   r = r.replace(/(\$\w+)\s*<\s*(\$?\w+)/g, '(< $1 $2)');
 
+  // 논리 연산자 (&&, ||)
+  r = r.replace(/(\$?\w+|\([^)]+\))\s*&&\s*(\$?\w+|\([^)]+\))/g, '(and $1 $2)');
+  r = r.replace(/(\$?\w+|\([^)]+\))\s*\|\|\s*(\$?\w+|\([^)]+\))/g, '(or $1 $2)');
+
+  // 산술 (%, **, 먼저)
+  r = r.replace(/(\$?\w+)\s*%\s*(\$?\w+)/g, '(mod $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\*\*\s*(\$?\w+)/g, '(pow $1 $2)');
+
   r = r.replace(/(\$?\w+)\s*\*\s*(\$?\w+)/g, '(* $1 $2)');
   r = r.replace(/(\$?\w+)\s*\/\s*(\$?\w+)/g, '(/ $1 $2)');
   r = r.replace(/(\$?\w+)\s*\+\s*(\$?\w+)/g, '(+ $1 $2)');
   r = r.replace(/(\$?\w+)\s*-\s*(\$?\w+)/g, '(- $1 $2)');
+
+  // 비트 연산자
+  r = r.replace(/(\$?\w+)\s*&\s*(\$?\w+)/g, '(bit-and $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\|\s*(\$?\w+)/g, '(bit-or $1 $2)');
+  r = r.replace(/(\$?\w+)\s*\^\s*(\$?\w+)/g, '(bit-xor $1 $2)');
+  r = r.replace(/(\$?\w+)\s*<<\s*(\$?\w+)/g, '(shl $1 $2)');
+  r = r.replace(/(\$?\w+)\s*>>\s*(\$?\w+)/g, '(shr $1 $2)');
 
   return r;
 }
@@ -117,24 +134,78 @@ function stmtToSExpr(s: any): string {
     return `(let $${s.name} ${v})`;
   } else if (s.type === 'Return') {
     const v = s.value ? exprToSExpr(s.value) : '';
-    return v ? v : '';
-  } else if (s.type === 'Call') {
-    return exprToSExpr(s);
+    return v || '';
+  } else if (s.type === 'Call' || s.type === 'ExprStatement') {
+    const expr = s.type === 'ExprStatement' ? s.expression : s;
+    return exprToSExpr(expr);
+  } else if (s.type === 'IfStatement') {
+    const cond = exprToSExpr(s.condition);
+    const thenStmts = (s.thenBranch || []).map(stmtToSExpr).filter(Boolean).join(' ');
+    const thenBlk = thenStmts.includes(' ') ? `(do ${thenStmts})` : thenStmts;
+    if (s.elseBranch && s.elseBranch.length > 0) {
+      const elseStmts = s.elseBranch.map(stmtToSExpr).filter(Boolean).join(' ');
+      const elseBlk = elseStmts.includes(' ') ? `(do ${elseStmts})` : elseStmts;
+      return `(if ${cond} ${thenBlk} ${elseBlk})`;
+    }
+    return `(if ${cond} ${thenBlk})`;
+  } else if (s.type === 'WhileStatement') {
+    const cond = exprToSExpr(s.condition);
+    const body = (s.body || []).map(stmtToSExpr).filter(Boolean).join(' ');
+    return `(while ${cond} (do ${body}))`;
+  } else if (s.type === 'ForStatement') {
+    const iter = exprToSExpr(s.iterable);
+    const body = (s.body || []).map(stmtToSExpr).filter(Boolean).join(' ');
+    return `(for $${s.variable} ${iter} (do ${body}))`;
+  } else if (s.type === 'MatchStatement') {
+    const subj = exprToSExpr(s.subject);
+    const arms = (s.arms || []).map((arm: any) => {
+      const pat = arm.pattern ? exprToSExpr(arm.pattern) : '_';
+      const body = arm.body.map(stmtToSExpr).filter(Boolean).join(' ');
+      return `(case ${pat} ${body})`;
+    }).join(' ');
+    return `(match ${subj} ${arms})`;
+  } else if (s.type === 'Break') {
+    return '(break)';
+  } else if (s.type === 'Continue') {
+    return '(continue)';
   }
   return '';
 }
 
+function cvtOp(op: string): string {
+  const map: Record<string, string> = {
+    '+': '+', '-': '-', '*': '*', '/': '/', '%': 'mod',
+    '==': '=', '!=': '!=', '<': '<', '>': '>', '<=': '<=', '>=': '>=',
+    '&&': 'and', '||': 'or', '**': 'pow',
+    '&': 'bit-and', '|': 'bit-or', '^': 'bit-xor', '<<': 'shl', '>>': 'shr',
+  };
+  return map[op] || op;
+}
+
 function exprToSExpr(e: any): string {
+  if (!e) return '';
   if (e.type === 'Call') {
     const a = e.args?.map((x: any) => exprToSExpr(x)).join(' ') || '';
     const c = e.callee?.name || 'x';
     return a ? `(${c} ${a})` : `(${c})`;
+  } else if (e.type === 'BinaryExpr') {
+    const l = exprToSExpr(e.left);
+    const r = exprToSExpr(e.right);
+    const op = cvtOp(e.operator);
+    return `(${op} ${l} ${r})`;
   } else if (e.type === 'Number') {
-    return e.value;
+    return String(e.value);
   } else if (e.type === 'String') {
     return `"${e.value}"`;
   } else if (e.type === 'Identifier') {
     return `$${e.name}`;
+  } else if (e.type === 'MemberAccess') {
+    return `$${exprToSExpr(e.object).replace(/^\$/, '')}.${e.property}`;
+  } else if (e.type === 'ArrayAccess') {
+    return `(get ${exprToSExpr(e.object)} ${exprToSExpr(e.index)})`;
+  } else if (e.type === 'Array') {
+    const elems = (e.elements || []).map((x: any) => exprToSExpr(x)).join(' ');
+    return `(list ${elems})`;
   }
   return '';
 }
