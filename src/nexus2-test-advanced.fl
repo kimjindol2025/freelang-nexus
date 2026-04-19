@@ -1,0 +1,113 @@
+; Nexus 2 고급 테스트 - 함수명 정확 추출
+
+[FUNC extract-fn-name
+  :params [$line $lang]
+  :body (let [$trimmed (trim $line)]
+    (cond
+      (= $lang "rust")
+        (let [$start (index-of $trimmed "fn ")]
+          (if (>= $start 0)
+            (let [$name-start (+ $start 3)]
+              (let [$paren (index-of (slice $trimmed $name-start (length $trimmed)) "(")]
+                (if (>= $paren 0)
+                  (trim (slice $trimmed $name-start (+ $name-start $paren)))
+                  null)))
+            null))
+      (= $lang "go")
+        (let [$start (index-of $trimmed "func ")]
+          (if (>= $start 0)
+            (let [$name-start (+ $start 5)]
+              (let [$paren (index-of (slice $trimmed $name-start (length $trimmed)) "(")]
+                (if (>= $paren 0)
+                  (trim (slice $trimmed $name-start (+ $name-start $paren)))
+                  null)))
+            null))
+      (= $lang "python")
+        (let [$start (index-of $trimmed "def ")]
+          (if (>= $start 0)
+            (let [$name-start (+ $start 4)]
+              (let [$paren (index-of (slice $trimmed $name-start (length $trimmed)) "(")]
+                (if (>= $paren 0)
+                  (trim (slice $trimmed $name-start (+ $name-start $paren)))
+                  null)))
+            null))
+      :else
+        null))
+]
+
+[FUNC slice
+  :params [$s $start $end]
+  :body (loop [i $start res ""]
+    (if (>= i $end)
+      $res
+      (recur (inc i) (str res (get $s i)))))
+]
+
+[FUNC index-of
+  :params [$s $substr]
+  :body (let [$len (length $substr)]
+    (loop [i 0]
+      (if (>= (+ i $len) (length $s))
+        -1
+        (if (= (slice $s i (+ i $len)) $substr)
+          i
+          (recur (inc i))))))
+]
+
+[FUNC current-lang
+  :params [$tokens $pos]
+  :body (loop [i $pos lang ""]
+    (if (>= i $pos)
+      (if (>= i (length $tokens))
+        lang
+        (let [$token (get $tokens i)]
+          (if (contains? $token "@lang")
+            (let [$start (index-of $token "(")]
+              (if (>= $start 0)
+                (let [$end (index-of (slice $token $start (length $token)) ")")]
+                  (if (>= $end 0)
+                    (trim (slice $token (inc $start) (+ $start $end)))
+                    lang))))
+            lang)))
+      lang))
+]
+
+[FUNC transpile-nexus2
+  :params [$source]
+  :body (let [$tokens (str-split $source "\n")]
+    (loop [i 0 out [] curr-lang ""]
+      (if (>= i (length $tokens))
+        (str-join "\n" $out)
+        (let [$line (get $tokens i)]
+          (let [$new-lang (if (contains? $line "@lang")
+            (let [$start (index-of $line "(")]
+              (if (>= $start 0)
+                (trim (slice $line (inc $start) (index-of (slice $line $start (length $line)) ")")))
+                $curr-lang))
+            $curr-lang)]
+            (let [$fn-name (extract-fn-name $line $new-lang)]
+              (if $fn-name
+                (let [$block (str "[FUNC " $fn-name "\n  :params []\n  :return number\n  :body null\n]")]
+                  (recur (inc i) (conj $out $block) $new-lang))
+                (recur (inc i) $out $new-lang))))))))
+]
+
+(println
+  (transpile-nexus2
+    "@lang(rust)
+fn double_it(x: i32) -> i32 { x * 2 }
+fn triple_it(x: i32) -> i32 { x * 3 }
+
+@lang(go)
+func AddNumbers(a int, b int) int {
+  return a + b
+}
+func MultiplyByTwo(x int) int {
+  return x * 2
+}
+
+@lang(python)
+def greet(name):
+  return 'Hello ' + name
+def add_numbers(a, b):
+  return a + b"))
