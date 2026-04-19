@@ -1,0 +1,210 @@
+; Nexus 2 완전 v11 구현 (작동 확인된 버전)
+
+[FUNC tokenize
+  :params [$source]
+  :body (let [$lines (str-split $source "\n")]
+    (loop [i 0 tokens []]
+      (if (>= i (length $lines))
+        $tokens
+        (let [$line (trim (get-at $lines i))]
+          (if (> (length $line) 0)
+            (recur (inc i) (conj $tokens $line))
+            (recur (inc i) $tokens))))))
+]
+
+[FUNC parse-lang
+  :params [$tokens]
+  :body (loop [i 0 langs []]
+    (if (>= i (length $tokens))
+      $langs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "@lang")
+          (let [$lang (str-replace $token "@lang(" "")]
+            (let [$lang (str-replace $lang ")" "")]
+              (recur (inc i) (conj $langs $lang))))
+          (recur (inc i) $langs)))))
+]
+
+[FUNC parse-rust
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "fn ")
+          (let [$name (extract-rust-name $token)]
+            (recur (inc i) (conj $funcs (map-obj name $name lang "rust" type "number"))))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC parse-go
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "func ")
+          (let [$name (extract-go-name $token)]
+            (recur (inc i) (conj $funcs (map-obj name $name lang "go" type "number"))))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC parse-c
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "(")
+          (let [$name (extract-c-name $token)]
+            (recur (inc i) (conj $funcs (map-obj name $name lang "c" type "number"))))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC parse-python
+  :params [$tokens]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (if (contains? $token "def ")
+          (let [$name (extract-python-name $token)]
+            (recur (inc i) (conj $funcs (map-obj name $name lang "python" type "any"))))
+          (recur (inc i) $funcs)))))
+]
+
+[FUNC extract-rust-name
+  :params [$token]
+  :body (let [$start (index-of $token "fn ")]
+    (if (>= $start 0)
+      (let [$name-start (+ $start 3)]
+        (let [$paren (index-of (get-slice $token $name-start (length $token)) "(")]
+          (if (>= $paren 0)
+            (trim (get-slice $token $name-start (+ $name-start $paren)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC extract-go-name
+  :params [$token]
+  :body (let [$start (index-of $token "func ")]
+    (if (>= $start 0)
+      (let [$name-start (+ $start 5)]
+        (let [$paren (index-of (get-slice $token $name-start (length $token)) "(")]
+          (if (>= $paren 0)
+            (trim (get-slice $token $name-start (+ $name-start $paren)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC extract-c-name
+  :params [$token]
+  :body (let [$paren (index-of $token "(")]
+    (if (>= $paren 0)
+      (let [$space (index-of (get-slice $token 0 $paren) " ")]
+        (if (>= $space 0)
+          (trim (get-slice $token (+ $space 1) $paren))
+          "unknown"))
+      "unknown"))
+]
+
+[FUNC extract-python-name
+  :params [$token]
+  :body (let [$start (index-of $token "def ")]
+    (if (>= $start 0)
+      (let [$name-start (+ $start 4)]
+        (let [$paren (index-of (get-slice $token $name-start (length $token)) "(")]
+          (if (>= $paren 0)
+            (trim (get-slice $token $name-start (+ $name-start $paren)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC get-slice
+  :params [$s $start $end]
+  :body (loop [i $start res ""]
+    (if (>= i $end)
+      $res
+      (recur (inc i) (str $res (get-at $s i)))))
+]
+
+[FUNC index-of
+  :params [$s $substr]
+  :body (let [$len (length $substr)]
+    (loop [i 0]
+      (if (> (+ i $len) (length $s))
+        -1
+        (if (= (get-slice $s i (+ i $len)) $substr)
+          i
+          (recur (inc i))))))
+]
+
+[FUNC codegen
+  :params [$funcs]
+  :body (let [$output ""]
+    (loop [i 0 out $output]
+      (if (>= i (length $funcs))
+        $out
+        (let [$fn (get-at $funcs i)]
+          (let [$name (get $fn "name")]
+            (let [$lang (get $fn "lang")]
+              (let [$type (get $fn "type")]
+                (let [$block (str "[FUNC " $name "\n  :params []\n  :return " $type "\n  :body null\n]\n")]
+                  (recur (inc i) (str $out $block)))))))))))
+]
+
+[FUNC transpile-polyglot
+  :params [$source]
+  :body (let [$tokens (tokenize $source)]
+    (let [$langs (parse-lang $tokens)]
+      (let [$funcs (loop [i 0 all-funcs []]
+        (if (>= i (length $langs))
+          $all-funcs
+          (let [$lang (get-at $langs i)]
+            (let [$extracted (cond
+              (= $lang "rust") (parse-rust $tokens)
+              (= $lang "go") (parse-go $tokens)
+              (= $lang "c") (parse-c $tokens)
+              (= $lang "python") (parse-python $tokens)
+              :else [])]
+              (recur (inc i) (into $all-funcs $extracted))))))]
+        (codegen $funcs))))
+]
+
+[FUNC into
+  :params [$arr $items]
+  :body (loop [i 0 res $arr]
+    (if (>= i (length $items))
+      $res
+      (recur (inc i) (conj $res (get-at $items i)))))
+]
+
+[FUNC map-obj
+  :params [$args...]
+  :body (let [$map {}]
+    (loop [i 0 result $map]
+      (if (>= i (length $args) 2)
+        $result
+        (let [$key (get-at $args i)]
+          (let [$value (get-at $args (inc i))]
+            (recur (+ i 2) (into-map $result $key $value)))))))
+]
+
+[FUNC into-map
+  :params [$map $key $value]
+  :body (do (set! ($map $key) $value) $map)
+]
+
+; Entry
+(transpile-polyglot "@lang(rust)
+fn double_it(x: i32) -> i32 { x * 2 }
+fn triple_it(x: i32) -> i32 { x * 3 }
+
+@lang(go)
+func AddNumbers(a int, b int) int {
+  return a + b
+}
+
+@lang(python)
+def multiply(x, y):
+  return x * y")

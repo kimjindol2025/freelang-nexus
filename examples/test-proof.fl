@@ -1,0 +1,7 @@
+[FUNC add
+  :params [$a $b]
+  :return number
+  :body (+ $a $b)
+]
+
+(println (add 10 5))

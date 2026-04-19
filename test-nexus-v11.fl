@@ -1,0 +1,44 @@
+; Nexus 2 v11 - 간단한 테스트
+
+; 렉서
+[FUNC lex
+  :params [$source]
+  :body (let [$chars (str-split $source "")]
+    (loop [i 0 tokens []]
+      (if (>= i (length $chars))
+        $tokens
+        (let [$ch (get-at $chars i)]
+          (cond
+            (= $ch " ") (recur (inc i) $tokens)
+            (= $ch "\n") (recur (inc i) $tokens)
+            :else (recur (inc i) (conj $tokens $ch)))))))
+]
+
+; 파서
+[FUNC parse
+  :params [$tokens]
+  :body (map (fn [$t] (map-obj token $t)) $tokens)
+]
+
+; 트랜스파일러
+[FUNC transpile
+  :params [$ast]
+  :body (map (fn [$node] (map-obj type "function" value (get $node token))) $ast)
+]
+
+; 코드젠
+[FUNC codegen
+  :params [$transpiled]
+  :body (str-join "\n" (map (fn [$fn] (str "[FUNC " (get $fn value) "]")) $transpiled))
+]
+
+; 메인
+[FUNC nexus2
+  :params [$source]
+  :body (let [$tokens (lex $source)]
+    (let [$ast (parse $tokens)]
+      (let [$transpiled (transpile $ast)]
+        (codegen $transpiled))))
+]
+
+(nexus2 "fn double_it x = x * 2")

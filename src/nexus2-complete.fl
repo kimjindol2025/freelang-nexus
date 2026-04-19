@@ -1,0 +1,331 @@
+; Nexus 2 완전 v11 구현 (단일 파일)
+; 렉서 + 파서 + 트랜스파일러 + 코드젠
+
+; ============================================================================
+; 1. 토큰화 (Lexer)
+; ============================================================================
+
+[FUNC is-whitespace?
+  :params [$ch]
+  :body (or (= $ch " ") (= $ch "\t") (= $ch "\n") (= $ch "\r"))
+]
+
+[FUNC is-digit?
+  :params [$ch]
+  :body (and (>= $ch "0") (<= $ch "9"))
+]
+
+[FUNC is-identifier-start?
+  :params [$ch]
+  :body (or (and (>= $ch "a") (<= $ch "z"))
+            (and (>= $ch "A") (<= $ch "Z"))
+            (= $ch "_"))
+]
+
+[FUNC is-identifier-char?
+  :params [$ch]
+  :body (or (is-identifier-start? $ch) (is-digit? $ch) (= $ch "-") (= $ch "?") (= $ch "!"))
+]
+
+[FUNC tokenize-number
+  :params [$source $pos]
+  :body (loop [i $pos num ""]
+    (let [$ch (get-at $source i)]
+      (if (or (not $ch) (not (is-digit? $ch)))
+        (map-obj token (map-obj :type "NUMBER" :value num) :pos i)
+        (recur (inc i) (str num $ch)))))
+]
+
+[FUNC tokenize-identifier-or-keyword
+  :params [$source $pos]
+  :body (loop [i $pos id ""]
+    (let [$ch (get-at $source i)]
+      (if (or (not $ch) (not (is-identifier-char? $ch)))
+        (map-obj token (map-obj :type (if (is-keyword? $id) "KEYWORD" "IDENTIFIER") :value $id) :pos i)
+        (recur (inc i) (str id $ch)))))
+]
+
+[FUNC is-keyword?
+  :params [$word]
+  :body (or (= $word "if") (= $word "else") (= $word "while") (= $word "for")
+            (= $word "fn") (= $word "let") (= $word "do") (= $word "return")
+            (= $word "def") (= $word "import") (= $word "export"))
+]
+
+[FUNC tokenize-string
+  :params [$source $pos $quote]
+  :body (loop [i (inc $pos) str ""]
+    (let [$ch (get-at $source i)]
+      (cond
+        (not $ch) (map-obj token (map-obj :type "STRING" :value str) :pos i)
+        (= $ch $quote) (map-obj token (map-obj :type "STRING" :value str) :pos (inc i))
+        (= $ch "\\")
+          (let [$next (get-at $source (inc i))]
+            (let [$esc (cond (= $next "n") "\n" (= $next "t") "\t" (= $next "r") "\r" (= $next "\\") "\\" (= $next $quote) $quote :else $next)]
+              (recur (+ i 2) (str str $esc))))
+        :else
+          (recur (inc i) (str str $ch)))))
+]
+
+[FUNC skip-whitespace
+  :params [$source $pos]
+  :body (loop [i $pos]
+    (let [$ch (get-at $source i)]
+      (if (and $ch (is-whitespace? $ch))
+        (recur (inc i))
+        i)))
+]
+
+[FUNC skip-line-comment
+  :params [$source $pos]
+  :body (loop [i $pos]
+    (let [$ch (get-at $source i)]
+      (cond
+        (not $ch) i
+        (= $ch "\n") (inc i)
+        :else (recur (inc i)))))
+]
+
+[FUNC next-token
+  :params [$source $pos]
+  :body (let [$ch (get-at $source $pos)]
+    (cond
+      (not $ch) (map-obj token (map-obj :type "EOF" :value "") :pos $pos)
+      (= $ch "\n") (map-obj token (map-obj :type "NEWLINE" :value "\n") :pos (inc $pos))
+      (is-whitespace? $ch) (map-obj token null :pos (skip-whitespace $source $pos))
+      (and (= $ch "/") (= (get-at $source (inc $pos)) "/")) (map-obj token null :pos (skip-line-comment $source (+ $pos 2)))
+      (and (= $ch "#")) (map-obj token null :pos (skip-line-comment $source (inc $pos)))
+      (or (= $ch "\"") (= $ch "'")) (tokenize-string $source $pos $ch)
+      (is-digit? $ch) (tokenize-number $source $pos)
+      (is-identifier-start? $ch) (tokenize-identifier-or-keyword $source $pos)
+      :else
+        (let [$op (cond
+          (and (= $ch "-") (= (get-at $source (inc $pos)) "-") (= (get-at $source (+ $pos 2)) "-"))
+            (map-obj token (map-obj :type "RAW-BLOCK" :value "---") :pos (+ $pos 3))
+          (and (= $ch "=") (= (get-at $source (inc $pos)) "="))
+            (map-obj token (map-obj :type "OP" :value "==") :pos (+ $pos 2))
+          (and (= $ch "!") (= (get-at $source (inc $pos)) "="))
+            (map-obj token (map-obj :type "OP" :value "!=") :pos (+ $pos 2))
+          (and (= $ch ">") (= (get-at $source (inc $pos)) "="))
+            (map-obj token (map-obj :type "OP" :value ">=") :pos (+ $pos 2))
+          (and (= $ch "<") (= (get-at $source (inc $pos)) "="))
+            (map-obj token (map-obj :type "OP" :value "<=") :pos (+ $pos 2))
+          (or (= $ch "{") (= $ch "}") (= $ch "[") (= $ch "]") (= $ch "(") (= $ch ")")
+              (= $ch ",") (= $ch ";") (= $ch ":") (= $ch "=") (= $ch "+") (= $ch "-")
+              (= $ch "*") (= $ch "/") (= $ch "%") (= $ch "<") (= $ch ">") (= $ch "@"))
+            (map-obj token (map-obj :type "OP" :value $ch) :pos (inc $pos))
+          :else
+            (map-obj token null :pos (inc $pos)))]
+          (if (token $op) $op (map-obj token null :pos (inc $pos)))))))
+]
+
+[FUNC tokenize
+  :params [$source]
+  :body (loop [pos 0 tokens []]
+    (let [$result (next-token $source $pos)]
+      (let [$token (token $result)]
+        (if (= (:type $token) "EOF")
+          (conj $tokens $token)
+          (if $token
+            (recur (:pos $result) (conj $tokens $token))
+            (recur (:pos $result) $tokens))))))
+]
+
+; ============================================================================
+; 2. 파싱 (Parser)
+; ============================================================================
+
+[FUNC parse-lang-block
+  :params [$tokens $pos]
+  :body (let [$token (get-at $tokens $pos)]
+    (if (and $token (= (:value $token) "@"))
+      (let [$next (get-at $tokens (inc $pos))]
+        (if (and $next (= (:value $next) "lang"))
+          (let [$paren (get-at $tokens (+ $pos 2))]
+            (if (and $paren (= (:value $paren) "("))
+              (let [$lang-tok (get-at $tokens (+ $pos 3))]
+                (let [$code-start (+ $pos 5)]
+                  (let [$code (loop [i $code-start str ""]
+                    (let [$t (get-at $tokens i)]
+                      (if (or (not $t) (= (:type $t) "EOF"))
+                        $str
+                        (let [$next-t (get-at $tokens (inc i))]
+                          (if (= (:type $next-t) "EOF")
+                            (str $str "\n" (:value $t))
+                            (recur (inc i) (str $str "\n" (:value $t))))))))]
+                    (map-obj :ast (map-obj :type "LangBlock" :lang (:value $lang-tok) :sourceCode $code) :pos $code-start)))))
+              (map-obj :ast null :pos $pos)))
+          (map-obj :ast null :pos $pos)))
+      (map-obj :ast null :pos $pos)))
+]
+
+[FUNC parse-expression
+  :params [$tokens $pos]
+  :body (let [$token (get-at $tokens $pos)]
+    (cond
+      (= (:type $token) "NUMBER")
+        (map-obj :ast (map-obj :type "Number" :value (:value $token)) :pos (inc $pos))
+      (= (:type $token) "STRING")
+        (map-obj :ast (map-obj :type "String" :value (:value $token)) :pos (inc $pos))
+      (= (:type $token) "IDENTIFIER")
+        (map-obj :ast (map-obj :type "Identifier" :name (:value $token)) :pos (inc $pos))
+      :else
+        (map-obj :ast null :pos $pos)))
+]
+
+[FUNC parse-top-level
+  :params [$tokens $pos]
+  :body (let [$token (get-at $tokens $pos)]
+    (cond
+      (not $token) (map-obj :ast null :pos $pos)
+      (= (:value $token) "@") (parse-lang-block $tokens $pos)
+      (= (:type $token) "EOF") (map-obj :ast null :pos $pos)
+      :else (map-obj :ast null :pos (inc $pos))))
+]
+
+[FUNC parse
+  :params [$tokens]
+  :body (loop [pos 0 nodes []]
+    (let [$result (parse-top-level $tokens $pos)]
+      (let [$node (:ast $result)]
+        (let [$next-pos (:pos $result)]
+          (if (= (:type $node) "EOF")
+            (map-obj :type "Program" :body $nodes)
+            (if $node
+              (recur $next-pos (conj $nodes $node))
+              (recur $next-pos $nodes)))))))
+]
+
+; ============================================================================
+; 3. 트랜스파일러 (Transpiler)
+; ============================================================================
+
+[FUNC extract-rust-functions
+  :params [$code]
+  :body (let [$lines (str-split $code "\n")]
+    (loop [i 0 functions []]
+      (if (>= i (length $lines))
+        $functions
+        (let [$line (get-at $lines i)]
+          (if (contains? $line "fn")
+            (recur (inc i) (conj $functions (map-obj :name "rust-fn" :params [] :return-type "number" :body $line :lang "rust")))
+            (recur (inc i) $functions))))))
+]
+
+[FUNC extract-go-functions
+  :params [$code]
+  :body (let [$lines (str-split $code "\n")]
+    (loop [i 0 functions []]
+      (if (>= i (length $lines))
+        $functions
+        (let [$line (get-at $lines i)]
+          (if (contains? $line "func")
+            (recur (inc i) (conj $functions (map-obj :name "go-fn" :params [] :return-type "number" :body $line :lang "go")))
+            (recur (inc i) $functions))))))
+]
+
+[FUNC extract-c-functions
+  :params [$code]
+  :body (let [$lines (str-split $code "\n")]
+    (loop [i 0 functions []]
+      (if (>= i (length $lines))
+        $functions
+        (let [$line (get-at $lines i)]
+          (if (contains? $line "{")
+            (recur (inc i) (conj $functions (map-obj :name "c-fn" :params [] :return-type "number" :body $line :lang "c")))
+            (recur (inc i) $functions))))))
+]
+
+[FUNC extract-python-functions
+  :params [$code]
+  :body (let [$lines (str-split $code "\n")]
+    (loop [i 0 functions []]
+      (if (>= i (length $lines))
+        $functions
+        (let [$line (get-at $lines i)]
+          (if (contains? $line "def")
+            (recur (inc i) (conj $functions (map-obj :name "py-fn" :params [] :return-type "any" :body $line :lang "python")))
+            (recur (inc i) $functions))))))
+]
+
+[FUNC transpile-polyglot
+  :params [$ast]
+  :body (let [$body-nodes (get $ast :body)]
+    (loop [i 0 functions []]
+      (if (>= i (length $body-nodes))
+        (map-obj :functions $functions :v-code "")
+        (let [$node (get-at $body-nodes i)]
+          (let [$lang (get $node :lang)]
+            (let [$source-code (get $node :sourceCode)]
+              (let [$extracted (cond
+                (= $lang "rust") (extract-rust-functions $source-code)
+                (= $lang "go") (extract-go-functions $source-code)
+                (= $lang "c") (extract-c-functions $source-code)
+                (= $lang "python") (extract-python-functions $source-code)
+                :else [])]
+                (recur (inc i) (into $functions $extracted))))))))))
+]
+
+[FUNC into
+  :params [$arr $items]
+  :body (loop [i 0 res $arr]
+    (if (>= i (length $items))
+      $res
+      (recur (inc i) (conj $res (get-at $items i)))))
+]
+
+; ============================================================================
+; 4. 코드젠 (Codegen)
+; ============================================================================
+
+[FUNC map-type
+  :params [$lang $type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "void") "void"
+      (or (= $ts "i64") (= $ts "i32") (= $ts "int") (= $ts "f64") (= $ts "double") (= $ts "float")) "number"
+      (or (= $ts "str") (= $ts "string")) "string"
+      (= $ts "bool") "bool"
+      :else "number"))
+]
+
+[FUNC emit-func
+  :params [$fn]
+  :body (let [$name (get $fn "name")]
+    (let [$params (get $fn "params")]
+      (let [$return-type (get $fn "return-type")]
+        (let [$body (get $fn "body")]
+          (let [$params-str (str-join " " (map (fn [$p] (str "$" (get $p "name"))) $params))]
+            (let [$rt (map-type (get $fn "lang") $return-type)]
+              (str "[FUNC " $name "\n"
+                   "  :params [" $params-str "]\n"
+                   (if (= $return-type "void") "" (str "  :return " $rt "\n"))
+                   "  :body " (str-trim $body) "\n"
+                   "]")))))))
+]
+
+[FUNC generate-code
+  :params [$ast $transpiled]
+  :body (let [$functions (get $transpiled "functions")]
+    (let [$output []]
+      (loop [i 0 res $output]
+        (if (>= i (length $functions))
+          (str-join "\n\n" $res)
+          (let [$fn (get-at $functions i)]
+            (recur (inc i) (conj $res (emit-func $fn))))))))
+]
+
+; ============================================================================
+; 5. 메인 (Main)
+; ============================================================================
+
+[FUNC main
+  :params [$source]
+  :body (let [$tokens (tokenize $source)]
+    (let [$ast (parse $tokens)]
+      (let [$transpiled (transpile-polyglot $ast)]
+        (generate-code $ast $transpiled))))
+]
+
+; Entry point
+(main $source)

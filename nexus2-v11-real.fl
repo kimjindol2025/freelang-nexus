@@ -1,0 +1,62 @@
+; Nexus 2 실제 v11 구현 (간소화)
+
+[FUNC tokenize
+  :params [$source]
+  :body (loop [i 0 res []]
+    (let [$lines (str-split $source "\n")]
+      (if (>= i (length $lines))
+        $res
+        (let [$line (trim (get-at $lines i))]
+          (if (> (length $line) 0)
+            (recur (inc i) (conj $res $line))
+            (recur (inc i) $res))))))
+]
+
+[FUNC extract-lang
+  :params [$tokens]
+  :body (loop [i 0 lang-blocks []]
+    (if (>= i (length $tokens))
+      $lang-blocks
+      (let [$token (get-at $tokens i)]
+        (if (starts-with? $token "@lang")
+          (let [$lang (trim (str-replace $token "@lang(" ""))]
+            (let [$lang (str-replace $lang ")" "")]
+              (recur (inc i) (conj $lang-blocks $lang))))
+          (recur (inc i) $lang-blocks)))))
+]
+
+[FUNC starts-with?
+  :params [$s $prefix]
+  :body (let [$len (length $prefix)]
+    (and (>= (length $s) $len)
+         (= (get-slice $s 0 $len) $prefix)))
+]
+
+[FUNC get-slice
+  :params [$s $start $end]
+  :body (let [$result ""]
+    (loop [i $start res $result]
+      (if (>= i $end)
+        $res
+        (recur (inc i) (str $res (get-at $s i))))))
+]
+
+[FUNC generate-fl
+  :params [$lang-blocks]
+  :body (let [$output ""]
+    (loop [i 0 out $output]
+      (if (>= i (length $lang-blocks))
+        $out
+        (let [$lang (get-at $lang-blocks i)]
+          (recur (inc i) (str $out "[FUNC " $lang "-fn :params [] :body null]\n"))))))
+]
+
+[FUNC nexus2-main
+  :params [$source]
+  :body (let [$tokens (tokenize $source)]
+    (let [$langs (extract-lang $tokens)]
+      (generate-fl $langs)))
+]
+
+(nexus2-main "@lang(rust)
+fn double_it(x: i32) -> i32 { x * 2 }")

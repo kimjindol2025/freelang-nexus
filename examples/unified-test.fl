@@ -1,0 +1,12 @@
+[FUNC double_it
+  :params [$x]
+  :return number
+  :body (* $x 2)
+]
+
+[FUNC main
+  :params []
+  :body (do (let $result (double_it 21)) (println $result) 0)
+]
+
+(main)

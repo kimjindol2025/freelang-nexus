@@ -1,0 +1,142 @@
+; Nexus 2 - 단순화 v11 구현
+
+[FUNC tokenize
+  :params [$source]
+  :body (let [$lines (str-split $source "\n")]
+    (loop [i 0 tokens []]
+      (if (>= i (length $lines))
+        $tokens
+        (let [$line (trim (get-at $lines i))]
+          (if (> (length $line) 0)
+            (recur (inc i) (conj $tokens $line))
+            (recur (inc i) $tokens))))))
+]
+
+[FUNC find-functions
+  :params [$tokens $lang]
+  :body (loop [i 0 funcs []]
+    (if (>= i (length $tokens))
+      $funcs
+      (let [$token (get-at $tokens i)]
+        (let [$fn (find-fn-in-token $token $lang)]
+          (if $fn
+            (recur (inc i) (conj $funcs $fn))
+            (recur (inc i) $funcs))))))
+]
+
+[FUNC find-fn-in-token
+  :params [$token $lang]
+  :body (if (= $lang "rust")
+    (if (contains? $token "fn ")
+      (map-obj "name" (extract-rust-name $token) "lang" "rust")
+      null)
+    (if (= $lang "go")
+      (if (contains? $token "func ")
+        (map-obj "name" (extract-go-name $token) "lang" "go")
+        null)
+      (if (= $lang "c")
+        (if (or (contains? $token "int ") (contains? $token "void "))
+          (map-obj "name" (extract-c-name $token) "lang" "c")
+          null)
+        (if (= $lang "python")
+          (if (contains? $token "def ")
+            (map-obj "name" (extract-python-name $token) "lang" "python")
+            null)
+          null))))
+]
+
+[FUNC extract-rust-name
+  :params [$token]
+  :body (let [$pos (index-of $token "fn ")]
+    (if (>= $pos 0)
+      (let [$start (+ $pos 3)]
+        (let [$end (index-of (slice $token $start (length $token)) "(")]
+          (if (>= $end 0)
+            (trim (slice $token $start (+ $start $end)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC extract-go-name
+  :params [$token]
+  :body (let [$pos (index-of $token "func ")]
+    (if (>= $pos 0)
+      (let [$start (+ $pos 5)]
+        (let [$end (index-of (slice $token $start (length $token)) "(")]
+          (if (>= $end 0)
+            (trim (slice $token $start (+ $start $end)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC extract-c-name
+  :params [$token]
+  :body (let [$paren (index-of $token "(")]
+    (if (>= $paren 0)
+      (let [$space (index-of (slice $token 0 $paren) " ")]
+        (if (>= $space 0)
+          (trim (slice $token (+ $space 1) $paren))
+          "unknown"))
+      "unknown"))
+]
+
+[FUNC extract-python-name
+  :params [$token]
+  :body (let [$pos (index-of $token "def ")]
+    (if (>= $pos 0)
+      (let [$start (+ $pos 4)]
+        (let [$end (index-of (slice $token $start (length $token)) "(")]
+          (if (>= $end 0)
+            (trim (slice $token $start (+ $start $end)))
+            "unknown")))
+      "unknown"))
+]
+
+[FUNC index-of
+  :params [$s $substr]
+  :body (let [$len (length $substr)]
+    (loop [i 0]
+      (if (>= (+ i $len) (length $s))
+        -1
+        (if (= (slice $s i (+ i $len)) $substr)
+          i
+          (recur (inc i))))))
+]
+
+[FUNC codegen
+  :params [$funcs]
+  :body (str-join "\n" (map (fn [$fn]
+    (str "[FUNC " (get $fn "name") "\n  :params []\n  :body null\n]"))
+    $funcs))
+]
+
+[FUNC nexus2
+  :params [$source]
+  :body (let [$tokens (tokenize $source)]
+    (let [$rust-funcs (find-functions $tokens "rust")]
+      (let [$go-funcs (find-functions $tokens "go")]
+        (let [$c-funcs (find-functions $tokens "c")]
+          (let [$py-funcs (find-functions $tokens "python")]
+            (let [$all (into (into (into (into [] $rust-funcs) $go-funcs) $c-funcs) $py-funcs)]
+              (codegen $all)))))))
+]
+
+[FUNC into
+  :params [$arr $items]
+  :body (loop [i 0 res $arr]
+    (if (>= i (length $items))
+      $res
+      (recur (inc i) (conj $res (get-at $items i)))))
+]
+
+(println (nexus2 "@lang(rust)
+fn add(x: i32, y: i32) -> i32 { x + y }
+
+@lang(go)
+func multiply(a int, b int) int {
+  return a * b
+}
+
+@lang(python)
+def subtract(x, y):
+  return x - y"))

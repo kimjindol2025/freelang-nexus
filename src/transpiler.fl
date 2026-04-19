@@ -1,0 +1,354 @@
+; Nexus 2 Transpiler (v11)
+; Extracts functions from Rust/Go/C/Python and transpiles to FreeLang v9
+
+[FUNC map-type
+  :params [$lang $type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "void") "void"
+      (or (= $ts "i64") (= $ts "i32") (= $ts "int") (= $ts "f64") (= $ts "double") (= $ts "float")) "number"
+      (or (= $ts "str") (= $ts "string")) "string"
+      (= $ts "bool") "bool"
+      :else "number"))
+]
+
+; Rust Type Mapping
+[FUNC rust-map-type
+  :params [$type-str]
+  :body (let [$ts (str-trim (str-replace $type-str (regex "&.*?(?=\\s|$)") ""))]
+    (cond
+      (= $ts "i32") "number"
+      (= $ts "i64") "number"
+      (= $ts "u32") "number"
+      (= $ts "u64") "number"
+      (= $ts "f32") "number"
+      (= $ts "f64") "number"
+      (= $ts "bool") "bool"
+      (= $ts "string") "string"
+      (= $ts "str") "string"
+      (= $ts "()") "void"
+      (= $ts "void") "void"
+      :else "number"))
+]
+
+; Go Type Mapping
+[FUNC go-map-type
+  :params [$type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "int") "number"
+      (= $ts "int32") "number"
+      (= $ts "int64") "number"
+      (= $ts "uint") "number"
+      (= $ts "uint32") "number"
+      (= $ts "uint64") "number"
+      (= $ts "float32") "number"
+      (= $ts "float64") "number"
+      (= $ts "bool") "bool"
+      (= $ts "string") "string"
+      (= $ts "rune") "number"
+      (= $ts "byte") "number"
+      (= $ts "error") "string"
+      :else "number"))
+]
+
+; C Type Mapping
+[FUNC c-map-type
+  :params [$type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "int") "number"
+      (= $ts "int32_t") "number"
+      (= $ts "int64_t") "number"
+      (= $ts "uint") "number"
+      (= $ts "uint32_t") "number"
+      (= $ts "uint64_t") "number"
+      (= $ts "float") "number"
+      (= $ts "double") "number"
+      (= $ts "bool") "bool"
+      (= $ts "_bool") "bool"
+      (= $ts "char") "number"
+      (= $ts "char*") "string"
+      (= $ts "void") "void"
+      :else "number"))
+]
+
+; Python Type Mapping
+[FUNC python-map-type
+  :params [$type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "int") "number"
+      (= $ts "float") "number"
+      (= $ts "str") "string"
+      (= $ts "bool") "bool"
+      (= $ts "none") "void"
+      (= $ts "any") "number"
+      :else "number"))
+]
+
+; Parse Rust parameters
+[FUNC parse-rust-params
+  :params [$param-str]
+  :body (let [$ps (str-trim $param-str)]
+    (if (= (length $ps) 0)
+      []
+      (let [$params (str-split $ps ",")]
+        (map (fn [$p]
+          (let [$parts (str-split (str-trim $p) ":")]
+            (if (>= (length $parts) 2)
+              (map-obj :name (str-trim (get-at $parts 0))
+                       :type (str-trim (get-at $parts 1)))
+              (map-obj :name (str-trim $p) :type "any"))))
+          $params))))
+]
+
+; Parse Go parameters
+[FUNC parse-go-params
+  :params [$param-str]
+  :body (let [$ps (str-trim $param-str)]
+    (if (= (length $ps) 0)
+      []
+      (let [$params (str-split $ps ",")]
+        (let [$result []]
+          (loop [i 0 res $result]
+            (if (>= i (length $params))
+              $res
+              (let [$p (str-trim (get-at $params i))]
+                (let [$parts (str-split $p " ")]
+                  (if (>= (length $parts) 2)
+                    (let [$name (get-at $parts 0)]
+                      (let [$type (str-join " " (get-slice $parts 1 (length $parts)))]
+                        (recur (inc i) (conj $res (map-obj :name $name :type $type)))))
+                    (recur (inc i) $res)))))))))))
+]
+
+; Parse C parameters
+[FUNC parse-c-params
+  :params [$param-str]
+  :body (let [$ps (str-trim $param-str)]
+    (if (= (length $ps) 0)
+      []
+      (let [$params (str-split $ps ",")]
+        (let [$result []]
+          (loop [i 0 res $result]
+            (if (>= i (length $params))
+              $res
+              (let [$p (str-trim (get-at $params i))]
+                (let [$parts (str-split $p " ")]
+                  (if (>= (length $parts) 2)
+                    (let [$name (get-at $parts (dec (length $parts)))]
+                      (let [$type (str-join " " (get-slice $parts 0 (dec (length $parts))))]
+                        (recur (inc i) (conj $res (map-obj :name $name :type $type)))))
+                    (recur (inc i) $res)))))))))))
+]
+
+; Parse Python parameters
+[FUNC parse-python-params
+  :params [$param-str]
+  :body (let [$ps (str-trim $param-str)]
+    (if (= (length $ps) 0)
+      []
+      (let [$params (str-split $ps ",")]
+        (map (fn [$p]
+          (map-obj :name (str-trim $p) :type "any"))
+          $params))))
+]
+
+; Extract Rust functions
+[FUNC extract-rust-functions
+  :params [$code]
+  :body (let [$pattern (regex "#\\[no_mangle\\]\\s*pub\\s+extern\\s+\"C\"\\s+fn\\s+(\\w+)\\s*\\(([^]*)\\)\\s*->\\s*(\\w+)\\s*{([^}]+)}")]
+    (let [$matches (find-all-matches $code $pattern)]
+      (map (fn [$m]
+        (let [$name (get-at $m 1)]
+          (let [$params-str (get-at $m 2)]
+            (let [$return-type (get-at $m 3)]
+              (let [$body (get-at $m 4)]
+                (let [$params (parse-rust-params $params-str)]
+                  (map-obj
+                    :name $name
+                    :params $params
+                    :return-type $return-type
+                    :body (str-trim $body)
+                    :lang "rust")))))))
+        $matches))))
+]
+
+; Extract Go functions
+[FUNC extract-go-functions
+  :params [$code]
+  :body (let [$pattern (regex "\\/\\/export\\s+(\\w+)\\s*\\nfunc\\s+(\\w+)\\s*\\(([^]*)\\)\\s*(\\w+)\\s*{([^}]+)}")]
+    (let [$matches (find-all-matches $code $pattern)]
+      (map (fn [$m]
+        (let [$fn-name (get-at $m 2)]
+          (let [$params-str (get-at $m 3)]
+            (let [$return-type (get-at $m 4)]
+              (let [$body (get-at $m 5)]
+                (let [$params (parse-go-params $params-str)]
+                  (map-obj
+                    :name $fn-name
+                    :params $params
+                    :return-type $return-type
+                    :body (str-trim $body)
+                    :lang "go")))))))
+        $matches))))
+]
+
+; Extract C functions
+[FUNC extract-c-functions
+  :params [$code]
+  :body (let [$pattern (regex "(\\w+)\\s+(\\w+)\\s*\\(([^]*)\\)\\s*{([^}]+)}")]
+    (let [$matches (find-all-matches $code $pattern)]
+      (map (fn [$m]
+        (let [$return-type (get-at $m 1)]
+          (let [$fn-name (get-at $m 2)]
+            (let [$params-str (get-at $m 3)]
+              (let [$body (get-at $m 4)]
+                (let [$params (parse-c-params $params-str)]
+                  (map-obj
+                    :name $fn-name
+                    :params $params
+                    :return-type $return-type
+                    :body (str-trim $body)
+                    :lang "c")))))))
+        $matches))))
+]
+
+; Extract Python functions
+[FUNC extract-python-functions
+  :params [$code]
+  :body (let [$pattern (regex "def\\s+(\\w+)\\s*\\(([^]]*?)\\):\\n((?:\\s+[^\\n]+\\n?)*)")]
+    (let [$matches (find-all-matches $code $pattern)]
+      (map (fn [$m]
+        (let [$fn-name (get-at $m 1)]
+          (let [$params-str (get-at $m 2)]
+            (let [$body (get-at $m 3)]
+              (let [$params (parse-python-params $params-str)]
+                (map-obj
+                  :name $fn-name
+                  :params $params
+                  :return-type "any"
+                  :body (str-trim $body)
+                  :lang "python"))))))
+        $matches))))
+]
+
+; Find all regex matches
+[FUNC find-all-matches
+  :params [$code $pattern]
+  :body (let [$result []]
+    (loop [pos 0 res $result]
+      (let [$m (regex-exec $pattern $code pos)]
+        (if $m
+          (recur (get-at $m :end) (conj $res $m))
+          $res))))
+]
+
+; Execute regex and return match object (calls built-in)
+[FUNC regex-exec
+  :params [$pattern $code $start]
+  :body (regex-exec-builtin $pattern $code (or $start 0))
+]
+
+; Transpile Rust body
+[FUNC transpile-rust-body
+  :params [$body]
+  :body (str-replace $body (regex "\\s+as\\s+\\w+") "")
+]
+
+; Transpile Go body
+[FUNC transpile-go-body
+  :params [$body]
+  :body (let [$b (str-replace $body (regex "panic\\([^)]*\\)") "null")]
+    (str-replace $b (regex ":=") "="))
+]
+
+; Transpile C body
+[FUNC transpile-c-body
+  :params [$body]
+  :body (let [$b (str-replace $body (regex "int\\s+(\\w+)\\s*=") "let $1 =")]
+    (let [$b (str-replace $b (regex "double\\s+(\\w+)\\s*=") "let $1 =")]
+      (let [$b (str-replace $b (regex "float\\s+(\\w+)\\s*=") "let $1 =")]
+        (let [$b (str-replace $b (regex "bool\\s+(\\w+)\\s*=") "let $1 =")]
+          (let [$b (str-replace $b (regex "char\\*\\s+(\\w+)\\s*=") "let $1 =")]
+            (let [$b (str-replace $b (regex "(\\w+)\\+\\+") "$1 = $1 + 1")]
+              (let [$b (str-replace $b (regex "(\\w+)--") "$1 = $1 - 1")]
+                (let [$b (str-replace $b (regex "printf\\s*\\(\\s*\"([^\"]*)\"\\s*\\)") "println(\"$1\")")]
+                  $b))))))))
+]
+
+; Transpile Python body
+[FUNC transpile-python-body
+  :params [$body]
+  :body (let [$b (str-replace $body (regex "print\\s*\\(") "println(")]
+    (let [$b (str-replace $b (regex "import\\s+\\w+\\n") "")]
+      (let [$b (str-replace $b (regex "from\\s+\\w+\\s+import\\s+\\w+\\n") "")]
+        (let [$b (str-replace $b (regex "def\\s+\\w+\\s*\\([^)]*\\):\\n") "")]
+          $b))))
+]
+
+; Main transpiler
+[FUNC transpile-polyglot
+  :params [$ast]
+  :body (let [$functions []]
+    (let [$body-nodes (:body $ast)]
+      (loop [i 0 fns $functions v-code ""]
+        (if (>= i (length $body-nodes))
+          (map-obj :functions $fns :v-code $v-code)
+          (let [$node (get-at $body-nodes i)]
+            (let [$node-type (:type $node)]
+              (cond
+                (= $node-type "LangBlock")
+                  (let [$lang (str-lower (:lang $node))]
+                    (let [$source-code (:sourceCode $node)]
+                      (let [$extracted (cond
+                        (= $lang "rust") (extract-rust-functions $source-code)
+                        (= $lang "go") (extract-go-functions $source-code)
+                        (or (= $lang "c") (= $lang "cpp")) (extract-c-functions $source-code)
+                        (= $lang "python") (extract-python-functions $source-code)
+                        :else [])]
+                        (recur (inc i) (into $fns $extracted) $v-code))))
+                :else
+                  (recur (inc i) $fns $v-code))))))))
+]
+
+; Helper: into
+[FUNC into
+  :params [$arr $items]
+  :body (let [$result $arr]
+    (loop [i 0 res $result]
+      (if (>= i (length $items))
+        $res
+        (recur (inc i) (conj $res (get-at $items i))))))
+]
+
+; Helper: str-split
+[FUNC str-split
+  :params [$s $delimiter]
+  :body null  ; use built-in
+]
+
+; Helper: str-lower
+[FUNC str-lower
+  :params [$s]
+  :body (lowercase $s)
+]
+
+; Helper: get-slice
+[FUNC get-slice
+  :params [$arr $start $end]
+  :body (let [$result []]
+    (loop [i $start res $result]
+      (if (>= i $end)
+        $res
+        (recur (inc i) (conj $res (get-at $arr i))))))
+]
+
+; Helper: map-obj (create map/object)
+[FUNC map-obj
+  :params [$args...]
+  :body null  ; use built-in map
+]
+
+(transpile-polyglot $ast)

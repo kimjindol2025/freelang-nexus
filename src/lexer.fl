@@ -1,0 +1,181 @@
+; Nexus 2 Lexer (v11)
+; Tokenizes Nexus 2 source code (V mode + Python mode)
+
+[FUNC token-type
+  :params [$type $value $mode]
+  :body (map-obj
+    :type $type
+    :value $value
+    :mode $mode
+    :line 1
+    :col 1)
+]
+
+[FUNC is-whitespace?
+  :params [$ch]
+  :body (or (= $ch " ") (= $ch "\t") (= $ch "\n") (= $ch "\r"))
+]
+
+[FUNC is-digit?
+  :params [$ch]
+  :body (and (>= $ch "0") (<= $ch "9"))
+]
+
+[FUNC is-identifier-start?
+  :params [$ch]
+  :body (or (and (>= $ch "a") (<= $ch "z"))
+            (and (>= $ch "A") (<= $ch "Z"))
+            (= $ch "_"))
+]
+
+[FUNC is-identifier-char?
+  :params [$ch]
+  :body (or (is-identifier-start? $ch) (is-digit? $ch) (= $ch "-") (= $ch "?") (= $ch "!"))
+]
+
+[FUNC peek
+  :params [$source $pos $offset]
+  :body (let [$idx (+ $pos (or $offset 0))]
+    (if (< $idx (length $source))
+      (get-at $source $idx)
+      null))
+]
+
+[FUNC advance
+  :params [$pos]
+  :body (inc $pos)
+]
+
+[FUNC tokenize-number
+  :params [$source $pos]
+  :body (loop [i $pos num ""]
+    (if (or (>= i (length $source)) (not (is-digit? (get-at $source i))))
+      (map-obj :token (token-type "NUMBER" num "auto") :pos i)
+      (recur (inc i) (str num (get-at $source i)))))
+]
+
+[FUNC tokenize-identifier-or-keyword
+  :params [$source $pos]
+  :body (loop [i $pos id ""]
+    (let [$ch (get-at $source i)]
+      (if (or (not $ch) (not (is-identifier-char? $ch)))
+        (let [$is-keyword (is-keyword? $id)]
+          (map-obj :token (token-type (if $is-keyword "KEYWORD" "IDENTIFIER") $id "auto") :pos i))
+        (recur (inc i) (str id $ch)))))
+]
+
+[FUNC tokenize-string
+  :params [$source $pos $quote]
+  :body (loop [i (inc $pos) str ""]
+    (let [$ch (get-at $source i)]
+      (cond
+        (= $ch $quote)
+          (map-obj :token (token-type "STRING" str "auto") :pos (inc i))
+        (= $ch "\\")
+          (let [$next (get-at $source (inc i))]
+            (let [$esc (cond
+              (= $next "n") "\n"
+              (= $next "t") "\t"
+              (= $next "r") "\r"
+              (= $next "\\") "\\"
+              (= $next $quote) $quote
+              :else (str $next))]
+              (recur (+ i 2) (str str $esc))))
+        :else
+          (recur (inc i) (str str $ch)))))
+]
+
+[FUNC is-keyword?
+  :params [$word]
+  :body (or (= $word "if") (= $word "else") (= $word "while") (= $word "for")
+            (= $word "fn") (= $word "let") (= $word "do") (= $word "return")
+            (= $word "match") (= $word "def") (= $word "import") (= $word "export")
+            (= $word "true") (= $word "false") (= $word "null"))
+]
+
+[FUNC skip-whitespace
+  :params [$source $pos]
+  :body (loop [i $pos]
+    (let [$ch (get-at $source i)]
+      (if (and $ch (is-whitespace? $ch))
+        (recur (inc i))
+        i)))
+]
+
+[FUNC skip-line-comment
+  :params [$source $pos]
+  :body (loop [i $pos]
+    (let [$ch (get-at $source i)]
+      (cond
+        (not $ch) i
+        (= $ch "\n") (inc i)
+        :else (recur (inc i)))))
+]
+
+[FUNC tokenize-operator
+  :params [$source $pos]
+  :body (let [$ch (get-at $source $pos)]
+    (let [$ch2 (get-at $source (inc $pos))]
+      (let [$ch3 (get-at $source (+ $pos 2))]
+        (cond
+          (and (= $ch "-") (= $ch2 "-") (= $ch3 "-"))
+            (map-obj :token (token-type "RAW-BLOCK" "---" "auto") :pos (+ $pos 3))
+          (and (= $ch "=") (= $ch2 "="))
+            (map-obj :token (token-type "OP" "==" "auto") :pos (+ $pos 2))
+          (and (= $ch "!") (= $ch2 "="))
+            (map-obj :token (token-type "OP" "!=" "auto") :pos (+ $pos 2))
+          (and (= $ch ">") (= $ch2 "="))
+            (map-obj :token (token-type "OP" ">=" "auto") :pos (+ $pos 2))
+          (and (= $ch "<") (= $ch2 "="))
+            (map-obj :token (token-type "OP" "<=" "auto") :pos (+ $pos 2))
+          (and (= $ch "=") (= $ch2 ">"))
+            (map-obj :token (token-type "OP" "=>" "auto") :pos (+ $pos 2))
+          (and (= $ch ":") (= $ch2 "="))
+            (map-obj :token (token-type "OP" ":=" "auto") :pos (+ $pos 2))
+          (or (= $ch "{") (= $ch "}") (= $ch "[") (= $ch "]") (= $ch "(") (= $ch ")")
+              (= $ch "," ) (= $ch ";" ) (= $ch ":") (= $ch "=") (= $ch "+") (= $ch "-")
+              (= $ch "*") (= $ch "/") (= $ch "%") (= $ch "<") (= $ch ">") (= $ch "@"))
+            (map-obj :token (token-type "OP" $ch "auto") :pos (inc $pos))
+          :else
+            null))))
+]
+
+[FUNC next-token
+  :params [$source $pos]
+  :body (let [$ch (get-at $source $pos)]
+    (cond
+      (not $ch) (map-obj :token (token-type "EOF" "" "auto") :pos $pos)
+      (= $ch "\n") (map-obj :token (token-type "NEWLINE" "\n" "auto") :pos (inc $pos))
+      (is-whitespace? $ch) (map-obj :token null :pos (skip-whitespace $source $pos))
+      (and (= $ch "/") (= (get-at $source (inc $pos)) "/"))
+        (map-obj :token null :pos (skip-line-comment $source (+ $pos 2)))
+      (and (= $ch "#"))
+        (map-obj :token null :pos (skip-line-comment $source (inc $pos)))
+      (or (= $ch "\"") (= $ch "'"))
+        (tokenize-string $source $pos $ch)
+      (is-digit? $ch)
+        (tokenize-number $source $pos)
+      (is-identifier-start? $ch)
+        (tokenize-identifier-or-keyword $source $pos)
+      :else
+        (let [$op (tokenize-operator $source $pos)]
+          (if $op $op (map-obj :token null :pos (inc $pos)))))))
+]
+
+[FUNC tokenize
+  :params [$source]
+  :body (loop [pos 0 tokens []]
+    (let [$result (next-token $source $pos)]
+      (let [$token (:token $result)]
+        (let [$next-pos (:pos $result)]
+          (cond
+            (= (:type $token) "EOF")
+              (conj $tokens $token)
+            (not $token)
+              (recur $next-pos $tokens)
+            :else
+              (recur $next-pos (conj $tokens $token)))))))
+]
+
+; Entry point
+(tokenize $source)

@@ -1,0 +1,77 @@
+; Nexus 2 Main Entry Point (v11)
+; Orchestrates lexer → parser → transpiler → codegen
+
+[FUNC main
+  :params [$args]
+  :body (let [$cmd (get-at $args 0)]
+    (let [$file (get-at $args 1)]
+      (cond
+        (or (not $cmd) (not $file) (not (= $cmd "build")))
+          (do (println "Usage: nexus2 build <file.fl>") -1)
+        :else
+          (run-nexus2 $file))))
+]
+
+[FUNC run-nexus2
+  :params [$file]
+  :body (let [$source (read-file $file)]
+    (if (not $source)
+      (do (println (str "Error: Cannot read file " $file)) -1)
+      (let [$tokens (tokenize $source)]
+        (let [$ast (parse $tokens)]
+          (let [$transpiled (transpile-polyglot $ast)]
+            (let [$code (generate-code $ast $transpiled)]
+              (let [$output-file (str-replace $file (regex "\\.fl$") ".fl")]
+                (write-file $output-file $code)
+                (println (str "Generated: " $output-file))
+                0)))))))
+]
+
+[FUNC read-file
+  :params [$path]
+  :body (try
+    (fs-read-file $path "utf-8")
+    (catch [$e] null))
+]
+
+[FUNC write-file
+  :params [$path $content]
+  :body (try
+    (fs-write-file $path $content "utf-8")
+    (catch [$e] null))
+]
+
+[FUNC fs-read-file
+  :params [$path $encoding]
+  :body null  ; built-in
+]
+
+[FUNC fs-write-file
+  :params [$path $content $encoding]
+  :body null  ; built-in
+]
+
+[FUNC try
+  :params [$expr]
+  :body $expr
+]
+
+[FUNC catch
+  :params [$err-var $expr]
+  :body $expr
+]
+
+; Run main with command line args
+(let [$args (get-argv)]
+  (main (get-slice $args 2 (length $args))))
+]
+
+[FUNC get-argv
+  :params []
+  :body null  ; built-in __argv__
+]
+
+; Entry: call main
+(if __argv__
+  (main (get-slice __argv__ 2 (length __argv__)))
+  0)

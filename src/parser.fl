@@ -1,0 +1,210 @@
+; Nexus 2 Parser (v11)
+; Converts tokens to AST
+
+[FUNC ast-node
+  :params [$type $data]
+  :body (let [$node (map-obj :type $type)]
+    (let [$keys (object-keys $data)]
+      (loop [i 0 node $node]
+        (if (>= i (length $keys))
+          $node
+          (let [$key (get-at $keys i)]
+            (let [$value (map-get $data $key)]
+              (recur (inc i) (map-set $node $key $value))))))))
+]
+
+[FUNC object-keys
+  :params [$obj]
+  :body null  ; built-in
+]
+
+[FUNC map-get
+  :params [$map $key]
+  :body (get $map $key)
+]
+
+[FUNC map-set
+  :params [$map $key $value]
+  :body (let [$new-map (copy-map $map)]
+    (set! ($new-map $key) $value)
+    $new-map)
+]
+
+[FUNC copy-map
+  :params [$map]
+  :body null  ; built-in
+]
+
+[FUNC current-token
+  :params [$tokens $pos]
+  :body (if (< $pos (length $tokens))
+    (get-at $tokens $pos)
+    (map-obj :type "EOF" :value ""))
+]
+
+[FUNC peek-token
+  :params [$tokens $pos $offset]
+  :body (let [$idx (+ $pos (or $offset 1))]
+    (if (< $idx (length $tokens))
+      (get-at $tokens $idx)
+      (map-obj :type "EOF" :value "")))
+]
+
+[FUNC consume-token
+  :params [$tokens $pos $expected-type]
+  :body (let [$token (current-token $tokens $pos)]
+    (if (= (:type $token) $expected-type)
+      (map-obj :ok true :pos (inc $pos) :token $token)
+      (map-obj :ok false :pos $pos :token $token)))
+]
+
+[FUNC parse-lang-block
+  :params [$tokens $pos]
+  :body (let [$token (current-token $tokens $pos)]
+    (if (= (:type $token) "OP" :value "@")
+      (let [$next (current-token $tokens (inc $pos))]
+        (if (and (= (:type $next) "IDENTIFIER") (= (:value $next) "lang"))
+          (let [$paren (current-token $tokens (+ $pos 2))]
+            (if (= (:value $paren) "(")
+              (let [$lang-tok (current-token $tokens (+ $pos 3))]
+                (let [$close (current-token $tokens (+ $pos 4))]
+                  (if (= (:value $close) ")")
+                    (let [$raw-start (+ $pos 5)]
+                      (let [$raw-tok (current-token $tokens $raw-start)]
+                        (if (= (:type $raw-tok) "RAW-BLOCK")
+                          (loop [i (inc $raw-start) code ""]
+                            (let [$t (current-token $tokens i)]
+                              (cond
+                                (= (:type $t) "EOF") (map-obj :ast (ast-node "LangBlock" (map-obj :lang (:value $lang-tok) :sourceCode $code)) :pos i)
+                                (= (:type $t) "RAW-BLOCK")
+                                  (let [$next-t (current-token $tokens (inc i))]
+                                    (if (or (= (:type $next-t) "EOF") (= (:type $next-t) "OP"))
+                                      (map-obj :ast (ast-node "LangBlock" (map-obj :lang (:value $lang-tok) :sourceCode $code)) :pos i)
+                                      (recur (inc i) (str code "\n" (:value $t)))))
+                                :else (recur (inc i) (str code "\n" (:value $t))))))
+                          (map-obj :ast null :pos $raw-start))))
+                    (map-obj :ast null :pos $pos))))
+              (map-obj :ast null :pos $pos)))
+          (map-obj :ast null :pos $pos)))
+      (map-obj :ast null :pos $pos)))
+]
+
+[FUNC parse-identifier
+  :params [$tokens $pos]
+  :body (let [$token (current-token $tokens $pos)]
+    (if (= (:type $token) "IDENTIFIER")
+      (map-obj :ast (ast-node "Identifier" (map-obj :name (:value $token))) :pos (inc $pos))
+      (map-obj :ast null :pos $pos)))
+]
+
+[FUNC parse-primary
+  :params [$tokens $pos]
+  :body (let [$token (current-token $tokens $pos)]
+    (cond
+      (= (:type $token) "NUMBER")
+        (map-obj :ast (ast-node "Number" (map-obj :value (:value $token))) :pos (inc $pos))
+      (= (:type $token) "STRING")
+        (map-obj :ast (ast-node "String" (map-obj :value (:value $token))) :pos (inc $pos))
+      (= (:type $token) "IDENTIFIER")
+        (parse-identifier $tokens $pos)
+      (= (:value $token) "(")
+        (let [$inner (parse-expression $tokens (inc $pos))]
+          (let [$close (consume-token $tokens (:pos $inner) "OP")]
+            (if (:ok $close)
+              (map-obj :ast (:ast $inner) :pos (inc (:pos $close)))
+              (map-obj :ast null :pos $pos))))
+      :else
+        (map-obj :ast null :pos $pos)))
+]
+
+[FUNC parse-expression
+  :params [$tokens $pos]
+  :body (let [$primary (parse-primary $tokens $pos)]
+    (loop [ast (:ast $primary) p (:pos $primary)]
+      (let [$token (current-token $tokens p)]
+        (cond
+          (or (= (:value $token) "+") (= (:value $token) "-") (= (:value $token) "*") (= (:value $token) "/"))
+            (let [$right (parse-primary $tokens (inc p))]
+              (let [$new-ast (ast-node "BinOp" (map-obj :op (:value $token) :left $ast :right (:ast $right)))]
+                (recur $new-ast (:pos $right))))
+          :else
+            (map-obj :ast $ast :pos $p))))
+]
+
+[FUNC parse-statement
+  :params [$tokens $pos]
+  :body (let [$token (current-token $tokens $pos)]
+    (cond
+      (= (:value $token) "let")
+        (let [$name-tok (current-token $tokens (inc $pos))]
+          (let [$eq (current-token $tokens (+ $pos 2))]
+            (if (= (:value $eq) "=")
+              (let [$value (parse-expression $tokens (+ $pos 3))]
+                (map-obj :ast (ast-node "Assign" (map-obj :name (:value $name-tok) :value (:ast $value))) :pos (:pos $value)))
+              (map-obj :ast null :pos $pos))))
+      (= (:value $token) "return")
+        (let [$value (parse-expression $tokens (inc $pos))]
+          (map-obj :ast (ast-node "Return" (map-obj :value (:ast $value))) :pos (:pos $value)))
+      :else
+        (let [$expr (parse-expression $tokens $pos)]
+          (map-obj :ast (:ast $expr) :pos (:pos $expr))))
+]
+
+[FUNC parse-function-def
+  :params [$tokens $pos]
+  :body (let [$name-tok (current-token $tokens (inc $pos))]
+    (let [$paren (current-token $tokens (+ $pos 2))]
+      (if (= (:value $paren) "(")
+        (loop [i (+ $pos 3) params []]
+          (let [$token (current-token $tokens i)]
+            (cond
+              (= (:value $token) ")")
+                (let [$brace (current-token $tokens (inc i))]
+                  (if (= (:value $brace) "{")
+                    (loop [j (+ i 2) body []]
+                      (let [$t (current-token $tokens j)]
+                        (cond
+                          (= (:value $t) "}")
+                            (map-obj :ast (ast-node "FunctionDef" (map-obj :name (:value $name-tok) :params $params :body $body)) :pos (inc j))
+                          :else
+                            (let [$stmt (parse-statement $tokens j)]
+                              (recur (:pos $stmt) (conj $body (:ast $stmt)))))))
+                    (map-obj :ast null :pos $pos)))
+              (= (:value $token) ",")
+                (recur (inc i) $params)
+              (= (:type $token) "IDENTIFIER")
+                (recur (inc i) (conj $params (:value $token)))
+              :else
+                (recur (inc i) $params))))
+        (map-obj :ast null :pos $pos))))
+]
+
+[FUNC parse-top-level
+  :params [$tokens $pos]
+  :body (let [$token (current-token $tokens $pos)]
+    (cond
+      (= (:value $token) "@")
+        (parse-lang-block $tokens $pos)
+      (= (:value $token) "fn")
+        (parse-function-def $tokens $pos)
+      (= (:type $token) "EOF")
+        (map-obj :ast null :pos $pos)
+      :else
+        (map-obj :ast null :pos (inc $pos))))
+]
+
+[FUNC parse
+  :params [$tokens]
+  :body (loop [pos 0 nodes []]
+    (if (>= pos (length $tokens))
+      (ast-node "Program" (map-obj :body $nodes))
+      (let [$result (parse-top-level $tokens $pos)]
+        (let [$node (:ast $result)]
+          (let [$next-pos (:pos $result)]
+            (if $node
+              (recur $next-pos (conj $nodes $node))
+              (recur $next-pos $nodes)))))))
+]
+
+; Entry point
+(parse $tokens)

@@ -1,0 +1,79 @@
+; Nexus 2 Code Generator (v11)
+
+[FUNC map-type
+  :params [$lang $type-str]
+  :body (let [$ts (str-trim $type-str)]
+    (cond
+      (= $ts "void") "void"
+      (or (= $ts "i64") (= $ts "i32") (= $ts "int") (= $ts "f64") (= $ts "double") (= $ts "float")) "number"
+      (or (= $ts "str") (= $ts "string")) "string"
+      (= $ts "bool") "bool"
+      :else "number"))
+]
+
+[FUNC to-s-expr
+  :params [$lang $body]
+  :body (let [$b (str-trim $body)]
+    (let [$b (str-replace-regex $b "^\\s*return\\s+" "")]
+      (let [$b (str-replace-regex $b ";$" "")]
+        (cvt-s-expr $b))))
+]
+
+[FUNC cvt-s-expr
+  :params [$expr]
+  :body (let [$r (str-trim $expr)]
+    (let [$r (cvt-bin-op $r)]
+      (cvt-func $r)))
+]
+
+[FUNC cvt-bin-op
+  :params [$expr]
+  :body (let [$r $expr]
+    (let [$r (str-replace-regex $r "(\\$\\w+)\\s*>=\\s*(\\$?\\w+)" "(>= $1 $2)")]
+      (let [$r (str-replace-regex $r "(\\$\\w+)\\s*<=\\s*(\\$?\\w+)" "(<= $1 $2)")]
+        (let [$r (str-replace-regex $r "(\\$\\w+)\\s*==\\s*(\\$?\\w+)" "(= $1 $2)")]
+          (let [$r (str-replace-regex $r "(\\$\\w+)\\s*!=\\s*(\\$?\\w+)" "(!= $1 $2)")]
+            (let [$r (str-replace-regex $r "(\\$\\w+)\\s*>\\s*(\\$?\\w+)" "(> $1 $2)")]
+              (let [$r (str-replace-regex $r "(\\$\\w+)\\s*<\\s*(\\$?\\w+)" "(< $1 $2)")]
+                (let [$r (str-replace-regex $r "(\\$?\\w+)\\s*\\*\\s*(\\$?\\w+)" "(* $1 $2)")]
+                  (let [$r (str-replace-regex $r "(\\$?\\w+)\\s*/\\s*(\\$?\\w+)" "(/ $1 $2)")]
+                    (let [$r (str-replace-regex $r "(\\$?\\w+)\\s*\\+\\s*(\\$?\\w+)" "(+ $1 $2)")]
+                      (str-replace-regex $r "(\\$?\\w+)\\s*-\\s*(\\$?\\w+)" "(- $1 $2)")))))))))))
+]
+
+[FUNC cvt-func
+  :params [$expr]
+  :body (let [$r (str-replace-regex $expr "println\\s*\\(\\s*([^)]*)\\s*\\)" "(println $1)")]
+    (str-replace-regex $r "print\\s*\\(\\s*([^)]*)\\s*\\)" "(println $1)"))
+]
+
+[FUNC emit-func
+  :params [$fn]
+  :body (let [$name (get $fn "name")]
+    (let [$params (get $fn "params")]
+      (let [$return-type (get $fn "return-type")]
+        (let [$body (get $fn "body")]
+          (let [$params-str (str-join " " (map (fn [$p] (str "$" (get $p "name"))) $params))]
+            (let [$rt (map-type (get $fn "lang") $return-type)]
+              (let [$sb (to-s-expr (get $fn "lang") $body)]
+                (str "[FUNC " $name "\n"
+                     "  :params [" $params-str "]\n"
+                     (if (= $return-type "void") "" (str "  :return " $rt "\n"))
+                     "  :body " $sb "\n"
+                     "]"))))))))
+]
+
+[FUNC generate-code
+  :params [$ast $transpiled]
+  :body (let [$functions (get $transpiled "functions")]
+    (let [$output []]
+      (loop [i 0 output $output]
+        (if (>= i (length $functions))
+          (str-join "\n\n" $output)
+          (let [$fn (get-at $functions i)]
+            (let [$block (emit-func $fn)]
+              (recur (inc i) (conj $output $block))))))))
+]
+
+; Entry
+(generate-code $ast $transpiled)
